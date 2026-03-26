@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { subDays, format } from "date-fns"
 import { CircleHelp, GitCompareArrows, X } from "lucide-react"
 import dynamic from "next/dynamic"
 import { useChannel } from "@/hooks/use-channel"
@@ -45,10 +46,12 @@ export default function ChannelPage() {
   const vsParam = searchParams.get("vs")
 
   // Lifted filter state shared between both channels when comparing
+  const today = format(new Date(), "yyyy-MM-dd")
+  const thirtyDaysAgo = format(subDays(new Date(), 30), "yyyy-MM-dd")
   const [sharedSort, setSharedSort] = useState("views")
   const [sharedPeriod, setSharedPeriod] = useState("30")
-  const [sharedRangeStart, setSharedRangeStart] = useState("")
-  const [sharedRangeEnd, setSharedRangeEnd] = useState("")
+  const [sharedRangeStart, setSharedRangeStart] = useState(thirtyDaysAgo)
+  const [sharedRangeEnd, setSharedRangeEnd] = useState(today)
 
   const setSharedCustomRange = useCallback((start: string, end: string) => {
     setSharedPeriod("custom")
@@ -60,39 +63,17 @@ export default function ChannelPage() {
 
   const isComparing = !!vsParam
 
-  const primary = useChannel(
-    decodedHandle,
-    isComparing
-      ? {
-          externalSort: sharedSort,
-          externalPeriod: sharedPeriod,
-          externalRangeStart: sharedRangeStart || undefined,
-          externalRangeEnd: sharedRangeEnd || undefined,
-        }
-      : undefined
-  )
+  const sharedOptions = isComparing
+    ? {
+        externalSort: sharedSort,
+        externalPeriod: sharedPeriod,
+        externalRangeStart: sharedRangeStart,
+        externalRangeEnd: sharedRangeEnd,
+      }
+    : undefined
 
-  const comparison = useChannel(
-    isComparing ? vsParam : undefined,
-    isComparing
-      ? {
-          externalSort: sharedSort,
-          externalPeriod: sharedPeriod,
-          externalRangeStart: sharedRangeStart || undefined,
-          externalRangeEnd: sharedRangeEnd || undefined,
-        }
-      : undefined
-  )
-
-  // Initialize shared filters from primary when entering compare mode
-  useEffect(() => {
-    if (isComparing && !sharedRangeStart) {
-      setSharedSort(primary.sort)
-      setSharedPeriod(primary.period)
-      setSharedRangeStart(primary.rangeStart)
-      setSharedRangeEnd(primary.rangeEnd)
-    }
-  }, [isComparing]) // eslint-disable-line react-hooks/exhaustive-deps
+  const primary = useChannel(decodedHandle, sharedOptions)
+  const comparison = useChannel(isComparing ? vsParam : undefined, sharedOptions)
 
   // Normalize URL to match canonical handle from API
   useEffect(() => {
