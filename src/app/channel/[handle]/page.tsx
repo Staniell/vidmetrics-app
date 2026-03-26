@@ -1,13 +1,11 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { CircleHelp } from "lucide-react"
 import { useChannel } from "@/hooks/use-channel"
-import { parseChannelInput } from "@/lib/parse-channel-input"
-import { ChannelInput } from "@/components/channel-input"
 import { ChannelCard } from "@/components/channel-card"
-import { TrendingCarousel } from "@/components/trending-carousel"
+// import { TrendingCarousel } from "@/components/trending-carousel"
 import { ChartsRow } from "@/components/charts-row"
 import { FilterBar } from "@/components/filter-bar"
 import { VideoGrid } from "@/components/video-grid"
@@ -34,12 +32,15 @@ export default function ChannelPage() {
     error,
     sort,
     period,
+    rangeStart,
+    rangeEnd,
     trackedSince,
     nextPageToken,
     fetchChannel,
     fetchMoreVideos,
     setSort,
     setPeriod,
+    setCustomRange,
     retry,
   } = useChannel(decodedHandle)
 
@@ -54,47 +55,35 @@ export default function ChannelPage() {
   }, [channel?.handle, decodedHandle, router])
 
   const [searchQuery, setSearchQuery] = useState("")
-
-  const handleSubmit = useCallback(
-    async (input: string) => {
-      const parsed = parseChannelInput(input)
-      if (!parsed) return
-
-      if (parsed.type === "handle") {
-        const clean = parsed.value.replace(/^@/, "")
-        router.push(`/channel/${clean}`)
-      } else {
-        // Channel ID — resolve to handle via API, then navigate
-        const info = await fetchChannel(input)
-        if (info?.handle) {
-          router.replace(`/channel/${info.handle.replace(/^@/, "")}`)
-        }
-      }
-    },
-    [router, fetchChannel]
-  )
+  const [videoType, setVideoType] = useState("all")
 
   const filteredVideos = useMemo(() => {
-    if (!searchQuery.trim()) return videos
-    const q = searchQuery.toLowerCase()
-    return videos.filter((v) => v.title.toLowerCase().includes(q))
-  }, [videos, searchQuery])
+    let result = videos
+    if (videoType !== "all") {
+      result = result.filter((v) => v.videoType === videoType)
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter((v) => v.title.toLowerCase().includes(q))
+    }
+    return result
+  }, [videos, searchQuery, videoType])
 
   const filteredRangeVideos = useMemo(() => {
-    if (!searchQuery.trim()) return rangeVideos
-    const q = searchQuery.toLowerCase()
-    return rangeVideos.filter((v) => v.title.toLowerCase().includes(q))
-  }, [rangeVideos, searchQuery])
+    let result = rangeVideos
+    if (videoType !== "all") {
+      result = result.filter((v) => v.videoType === videoType)
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter((v) => v.title.toLowerCase().includes(q))
+    }
+    return result
+  }, [rangeVideos, searchQuery, videoType])
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 pb-12">
       <div className="space-y-6 pt-6">
-        <ChannelInput
-          onSubmit={handleSubmit}
-          isLoading={isLoading}
-          compact
-        />
-
         {isLoading && !channel && <LoadingState />}
 
         {error && <ErrorState message={error} onRetry={retry} />}
@@ -103,18 +92,23 @@ export default function ChannelPage() {
           <>
             <ChannelCard channel={channel} />
 
-            {rangeVideos.length > 0 && (
+            {/* {rangeVideos.length > 0 && (
               <TrendingCarousel videos={rangeVideos} />
-            )}
+            )} */}
 
             {videos.length > 0 && <ChartsRow videos={videos} />}
 
             <FilterBar
               sort={sort}
               period={period}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
+              videoType={videoType}
               searchQuery={searchQuery}
               onSortChange={setSort}
               onPeriodChange={setPeriod}
+              onCustomRangeChange={setCustomRange}
+              onVideoTypeChange={setVideoType}
               onSearchChange={setSearchQuery}
             />
 

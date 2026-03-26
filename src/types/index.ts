@@ -10,6 +10,8 @@ export type ChannelInfo = {
   publishedAt: string
 }
 
+export type VideoType = "video" | "short" | "live"
+
 export type VideoMetrics = {
   id: string
   title: string
@@ -20,6 +22,7 @@ export type VideoMetrics = {
   commentCount: number
   duration: string
   engagementRate: number
+  videoType: VideoType
 }
 
 export type ChannelResponse = {
@@ -45,6 +48,7 @@ export type VideoViewDelta = {
   viewsInRange: number
   dataSource: "estimated" | "velocity" | "tracked"
   resurgenceMultiplier: number
+  videoType: VideoType
 }
 
 export type ViewsInRangeResponse = {

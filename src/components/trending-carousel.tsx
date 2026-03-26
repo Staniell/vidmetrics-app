@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react"
 import Image from "next/image"
-import { ChevronLeft, ChevronRight, TrendingUp, Eye, Flame, Zap } from "lucide-react"
+import { ChevronLeft, ChevronRight, TrendingUp, Eye, Flame, Zap, Radio, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { formatNumber, formatDuration, formatRelativeAge } from "@/lib/format"
@@ -214,8 +214,22 @@ export function TrendingCarousel({ videos }: TrendingCarouselProps) {
                   )}
 
                   {/* Rank badge */}
-                  <div className="absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-white backdrop-blur-sm">
-                    {i + 1}
+                  <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-white backdrop-blur-sm">
+                      {i + 1}
+                    </div>
+                    {video.videoType === "short" && (
+                      <div className="flex items-center gap-1 rounded bg-rose-600/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                        <Smartphone className="h-3 w-3" />
+                        Short
+                      </div>
+                    )}
+                    {video.videoType === "live" && (
+                      <div className="flex items-center gap-1 rounded bg-red-600/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                        <Radio className="h-3 w-3" />
+                        Live
+                      </div>
+                    )}
                   </div>
 
                   {/* Duration */}

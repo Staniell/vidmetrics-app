@@ -1,10 +1,10 @@
 import Image from "next/image"
-import { Eye, ThumbsUp, MessageCircle, TrendingUp, Zap } from "lucide-react"
+import { Eye, ThumbsUp, MessageCircle, Zap, Radio, Smartphone } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatNumber, formatDate, formatDuration, formatEngagement, formatRelativeAge } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import type { VideoMetrics, VideoViewDelta } from "@/types"
+import type { VideoMetrics, VideoViewDelta, VideoType } from "@/types"
 
 interface VideoCardProps {
   video: VideoMetrics
@@ -12,6 +12,8 @@ interface VideoCardProps {
 }
 
 export function VideoCard({ video, rangeData }: VideoCardProps) {
+  const videoType: VideoType = video.videoType ?? rangeData?.videoType ?? "video"
+
   const engagementColor =
     video.engagementRate > 5
       ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
@@ -21,10 +23,11 @@ export function VideoCard({ video, rangeData }: VideoCardProps) {
 
   return (
     <a
+      id={`video-${video.id}`}
       href={`https://www.youtube.com/watch?v=${video.id}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="group block"
+      className="group block scroll-mt-20"
     >
       <Card className="overflow-hidden transition-shadow hover:shadow-md">
         <div className="relative aspect-video bg-muted">
@@ -37,6 +40,18 @@ export function VideoCard({ video, rangeData }: VideoCardProps) {
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             />
           )}
+          {videoType === "short" && (
+            <div className="absolute top-2 left-2 flex items-center gap-1 rounded bg-rose-600/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+              <Smartphone className="h-3 w-3" />
+              Short
+            </div>
+          )}
+          {videoType === "live" && (
+            <div className="absolute top-2 left-2 flex items-center gap-1 rounded bg-red-600/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+              <Radio className="h-3 w-3" />
+              Live
+            </div>
+          )}
           <div className="absolute bottom-2 right-2 rounded bg-black/80 px-1.5 py-0.5 text-xs font-medium text-white">
             {formatDuration(video.duration)}
           </div>
@@ -46,32 +61,19 @@ export function VideoCard({ video, rangeData }: VideoCardProps) {
             {video.title}
           </h3>
           {rangeData ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Published {formatRelativeAge(video.publishedAt)} · {formatNumber(rangeData.viewsInRange)} views this period
-            </p>
-          ) : (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {formatDate(video.publishedAt)}
-            </p>
-          )}
-
-          {rangeData && (
-            <div className="mt-2 flex items-center gap-1.5">
-              <TrendingUp className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-              <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-                +{formatNumber(rangeData.viewsInRange)} views
-              </span>
+            <span className="mt-1 text-xs block">
+              <span className="text-muted-foreground">Published {formatRelativeAge(video.publishedAt)} · </span>
+              <span className="text-green-700 dark:text-green-400">{formatNumber(rangeData.viewsInRange)} views this period</span>
               {rangeData.dataSource === "estimated" && (
-                <Badge variant="outline" className="ml-1 text-[10px] px-1.5 py-0">
+                <Badge variant="outline" className="ml-1 text-[10px] px-1.5 py-0 align-middle">
                   Est.
                 </Badge>
               )}
-              {rangeData.dataSource === "velocity" && (
-                <Badge variant="outline" className="ml-1 text-[10px] px-1.5 py-0 border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400">
-                  Live
-                </Badge>
-              )}
-            </div>
+            </span>
+          ) : (
+            <span className="mt-1 text-xs text-muted-foreground block">
+              {formatDate(video.publishedAt)}
+            </span>
           )}
 
           {rangeData && rangeData.dataSource !== "estimated" && rangeData.resurgenceMultiplier >= 5 && (

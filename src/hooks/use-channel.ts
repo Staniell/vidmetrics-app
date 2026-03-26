@@ -21,12 +21,15 @@ interface UseChannelReturn {
   error: string | null
   sort: string
   period: string
+  rangeStart: string
+  rangeEnd: string
   trackedSince: string | null
   nextPageToken: string | null
   fetchChannel: (input: string) => Promise<ChannelInfo | null>
   fetchMoreVideos: () => Promise<void>
   setSort: (sort: string) => void
   setPeriod: (period: string) => void
+  setCustomRange: (start: string, end: string) => void
   retry: () => void
 }
 
@@ -249,8 +252,15 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
     return () => controller.abort()
   }, [sort, period, channel])
 
-  // Sync range dates when period changes
+  const setCustomRange = useCallback((start: string, end: string) => {
+    setPeriod("custom")
+    setRangeStart(start)
+    setRangeEnd(end)
+  }, [])
+
+  // Sync range dates when period changes (skip for custom — dates set directly)
   useEffect(() => {
+    if (period === "custom") return
     const { start, end } = rangeDatesFromPeriod(period)
     setRangeStart(start)
     setRangeEnd(end)
@@ -302,12 +312,15 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
     error,
     sort,
     period,
+    rangeStart,
+    rangeEnd,
     trackedSince,
     nextPageToken,
     fetchChannel,
     fetchMoreVideos,
     setSort,
     setPeriod,
+    setCustomRange,
     retry,
   }
 }

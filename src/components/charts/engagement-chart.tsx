@@ -21,6 +21,7 @@ export function EngagementChart({ videos }: EngagementChartProps) {
     .sort((a, b) => b.engagementRate - a.engagementRate)
     .slice(0, 10)
     .map((v) => ({
+      id: v.id,
       title:
         v.title.length > 25 ? v.title.substring(0, 25) + "..." : v.title,
       fullTitle: v.title,
@@ -86,6 +87,18 @@ export function EngagementChart({ videos }: EngagementChartProps) {
           dataKey="engagement"
           fill="var(--color-chart-2)"
           radius={[4, 4, 0, 0]}
+          style={{ cursor: "pointer" }}
+          onClick={(_data: unknown, index: number) => {
+            const videoId = data[index]?.id
+            if (videoId) {
+              const el = document.getElementById(`video-${videoId}`)
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" })
+                el.classList.add("ring-2", "ring-primary", "rounded-lg")
+                setTimeout(() => el.classList.remove("ring-2", "ring-primary", "rounded-lg"), 2000)
+              }
+            }
+          }}
         />
       </BarChart>
     </ResponsiveContainer>

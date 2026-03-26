@@ -22,26 +22,45 @@ npx prisma generate  # Regenerate Prisma client after schema changes
 
 ## Architecture
 
-Single-page app with a snapshot-based view tracking system. API routes proxy YouTube Data API v3 (API key stays server-side) and store view snapshots in Neon PostgreSQL to calculate views gained in a date range.
+Multi-page app with a snapshot-based view tracking system. API routes proxy YouTube Data API v3 (API key stays server-side) and store view snapshots in Neon PostgreSQL to calculate views gained in a date range.
 
 ```
 src/
   app/
+    api/carousel/                         # GET → 24 trending creators for homepage carousel (cached 24h)
     api/channel/                          # GET /api/channel?handle=@Name → ChannelInfo
+    api/channel/search/                   # GET ?q= → up to 5 channel search results (autocomplete)
     api/channel/[channelId]/videos/       # GET → paginated VideoMetrics[]
     api/channel/[channelId]/views-in-range/ # GET ?start=&end= → VideoViewDelta[] sorted by views in range
     api/cron/snapshot/                    # GET → daily cron to snapshot all tracked videos
-    page.tsx                              # Main page (client component, uses useChannel hook)
+    page.tsx                              # Home page (channel search + hero carousel)
     layout.tsx                            # Root layout with ThemeProvider + NavBar
+    error.tsx                             # Global error boundary
+    loading.tsx                           # Root loading skeleton
+    icon.tsx                              # Dynamic SVG favicon
+    apple-icon.tsx                        # Dynamic Apple touch icon
+    globals.css                           # CSS variables (OKLCh), theme tokens, global styles
+    channel/[handle]/
+      page.tsx                            # Channel detail page (videos, charts, filters)
+      loading.tsx                         # Channel detail loading skeleton
+    how-it-works/
+      page.tsx                            # Educational page explaining VidMetrics methodology
   components/
-    ui/                       # shadcn/ui primitives (button, card, input, select, tooltip, etc.)
+    ui/                       # shadcn/ui primitives (badge, button, card, dropdown-menu, input, select, skeleton, tooltip)
     charts/                   # Recharts components (views-chart, engagement-chart)
-    channel-input.tsx         # URL input with hero/compact modes
+    channel-input.tsx         # URL input with autocomplete dropdown + hero/compact modes
     channel-card.tsx          # Channel overview card
     video-card.tsx            # Individual video card (shows range views + data source badge)
     video-grid.tsx            # Responsive grid of VideoCards
     filter-bar.tsx            # Sort/period/search controls + date range picker
     charts-row.tsx            # Dynamic import wrapper for both charts
+    hero-carousel.tsx         # Infinite marquee carousel of trending creators (homepage)
+    trending-carousel.tsx     # Horizontal scrollable top-10 videos carousel with drag/swipe
+    error-state.tsx           # Error message with retry button
+    loading-state.tsx         # Full-page skeleton loader
+    nav-bar.tsx               # Sticky header with logo, "How It Works" link, dark mode toggle
+    mode-toggle.tsx           # Dark/light/system theme switcher (uses next-themes)
+    theme-provider.tsx        # next-themes ThemeProvider wrapper
   generated/
     prisma/                   # Auto-generated Prisma client (do not edit, gitignored)
   hooks/
@@ -53,12 +72,14 @@ src/
     view-deltas.ts            # Three-tier view-in-range calculation (estimated/velocity/tracked)
     parse-channel-input.ts    # URL/handle parser
     format.ts                 # Number, date, duration formatters
+    utils.ts                  # cn() — Tailwind class merging (clsx + tailwind-merge)
   types/
     index.ts                  # ChannelInfo, VideoMetrics, VideoViewDelta, API response types
 prisma/
   schema.prisma               # TrackedChannel, TrackedVideo, ViewSnapshot models
 prisma.config.ts              # Prisma config (loads env from .env.local)
 vercel.json                   # Vercel cron: daily snapshot at midnight UTC
+components.json               # shadcn/ui config (new-york style, Tailwind v4, lucide icons)
 ```
 
 ## View Tracking System

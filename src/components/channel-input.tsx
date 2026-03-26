@@ -312,7 +312,7 @@ export function ChannelInput({
             }}
             onKeyDown={handleKeyDown}
             placeholder="Search channel or paste URL"
-            className="pl-9"
+            className="pl-9 border-transparent bg-muted/50 focus-visible:bg-muted"
             disabled={isLoading}
             role="combobox"
             aria-expanded={showDropdown}
@@ -328,7 +328,7 @@ export function ChannelInput({
             />
           )}
         </div>
-        <Button type="submit" size="sm" disabled={isLoading}>
+        <Button type="submit" size="sm" variant="secondary" disabled={isLoading}>
           {isLoading ? "Analyzing..." : "Analyze"}
         </Button>
         {error && (

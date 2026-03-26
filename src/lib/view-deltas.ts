@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { differenceInDays, differenceInMinutes } from "date-fns"
+import type { VideoType } from "@/types"
 
 type DataSource = "estimated" | "velocity" | "tracked"
 
@@ -16,6 +17,7 @@ export interface VideoViewDelta {
   viewsInRange: number
   dataSource: DataSource
   resurgenceMultiplier: number
+  videoType: VideoType
 }
 
 /**
@@ -39,6 +41,7 @@ export async function getViewsInRange(
     likeCount: number
     commentCount: number
     engagementRate: number
+    videoType: VideoType
   }[]
 ): Promise<{ videos: VideoViewDelta[]; trackedSince: string | null }> {
   const videoIds = videos.map((v) => v.id)
@@ -111,6 +114,13 @@ export async function getViewsInRange(
       dataSource = "estimated"
     }
 
+    // If the range encompasses the video's entire lifetime, views = total
+    const videoPublished = new Date(video.publishedAt)
+    if (rangeStart <= videoPublished) {
+      viewsInRange = video.viewCount
+      if (dataSource === "estimated") dataSource = "tracked"
+    }
+
     // Cap: views in range can never exceed total lifetime views
     viewsInRange = Math.min(viewsInRange, video.viewCount)
 
@@ -135,6 +145,7 @@ export async function getViewsInRange(
       viewsInRange,
       dataSource,
       resurgenceMultiplier,
+      videoType: video.videoType,
     }
   })
 

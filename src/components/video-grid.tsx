@@ -18,6 +18,7 @@ function toVideoMetrics(rv: VideoViewDelta): VideoMetrics {
     commentCount: rv.commentCount,
     duration: rv.duration,
     engagementRate: rv.engagementRate,
+    videoType: rv.videoType,
   }
 }
 

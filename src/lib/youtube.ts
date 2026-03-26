@@ -1,4 +1,4 @@
-import type { ChannelInfo, VideoMetrics } from "@/types"
+import type { ChannelInfo, VideoMetrics, VideoType } from "@/types"
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
 
@@ -126,32 +126,64 @@ export async function fetchVideoIds(
   nextPageToken?: string
   totalResults: number
 }> {
+  // Use the uploads playlist (UC→UU) via playlistItems.list (1 quota unit)
+  // instead of search.list (100 quota units) for reliable pagination
+  const uploadsPlaylistId = "UU" + channelId.slice(2)
+  const maxResults = options.maxResults || 50
+
   const params: Record<string, string> = {
-    part: "id",
-    channelId,
-    type: "video",
-    order: "date",
-    maxResults: String(options.maxResults || 50),
+    part: "snippet",
+    playlistId: uploadsPlaylistId,
+    maxResults: String(maxResults),
   }
 
-  if (options.publishedAfter) {
-    params.publishedAfter = options.publishedAfter
-  }
   if (options.pageToken) {
     params.pageToken = options.pageToken
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data = await youtubeGet<any>("search", params)
+  const data = await youtubeGet<any>("playlistItems", params)
+
+  const cutoff = options.publishedAfter
+    ? new Date(options.publishedAfter).getTime()
+    : 0
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const items = (data.items || []).filter((item: any) => {
+    if (!cutoff) return true
+    const published = new Date(item.snippet?.publishedAt || 0).getTime()
+    return published >= cutoff
+  })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const videoIds = items.map((item: any) => item.snippet?.resourceId?.videoId).filter(Boolean)
+
+  // If we filtered out items due to the date cutoff, don't offer pagination
+  // (remaining pages would be even older)
+  const hasDateFilteredItems = items.length < (data.items || []).length
+  const nextPageToken = hasDateFilteredItems ? undefined : data.nextPageToken
 
   return {
-    videoIds: (data.items || []).map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (item: any) => item.id?.videoId
-    ).filter(Boolean),
-    nextPageToken: data.nextPageToken,
+    videoIds,
+    nextPageToken,
     totalResults: data.pageInfo?.totalResults || 0,
   }
+}
+
+function parseDurationSeconds(isoDuration: string): number {
+  const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+  if (!match) return 0
+  const hours = parseInt(match[1] || "0", 10)
+  const minutes = parseInt(match[2] || "0", 10)
+  const seconds = parseInt(match[3] || "0", 10)
+  return hours * 3600 + minutes * 60 + seconds
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function detectVideoType(duration: string, liveStreamingDetails: any): VideoType {
+  if (liveStreamingDetails?.actualStartTime) return "live"
+  if (parseDurationSeconds(duration) <= 60) return "short"
+  return "video"
 }
 
 export async function fetchVideoDetails(
@@ -170,7 +202,7 @@ export async function fetchVideoDetails(
   for (const batch of batches) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await youtubeGet<any>("videos", {
-      part: "snippet,statistics,contentDetails",
+      part: "snippet,statistics,contentDetails,liveStreamingDetails",
       id: batch.join(","),
     })
 
@@ -181,6 +213,7 @@ export async function fetchVideoDetails(
       const views = parseInt(stats.viewCount || "0", 10)
       const likes = parseInt(stats.likeCount || "0", 10)
       const comments = parseInt(stats.commentCount || "0", 10)
+      const duration = item.contentDetails?.duration || "PT0S"
 
       results.push({
         id: item.id,
@@ -193,8 +226,9 @@ export async function fetchVideoDetails(
         viewCount: views,
         likeCount: likes,
         commentCount: comments,
-        duration: item.contentDetails?.duration || "PT0S",
+        duration,
         engagementRate: views > 0 ? ((likes + comments) / views) * 100 : 0,
+        videoType: detectVideoType(duration, item.liveStreamingDetails),
       })
     }
   }
