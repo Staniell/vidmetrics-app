@@ -78,23 +78,35 @@ export function CompareAggregates({
     },
   ]
 
+  const truncate = (name: string, max: number) =>
+    name.length > max ? name.slice(0, max) + "..." : name
+
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           {stats.map((stat) => (
-            <div key={stat.label} className="flex flex-col gap-1.5">
+            <div key={stat.label} className="flex flex-col gap-2">
               <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">
                 {stat.label}
               </span>
-              <div className="flex items-baseline justify-between gap-2">
-                <span className={cn("text-sm font-semibold", stat.pClass)} title={primaryName}>
-                  {stat.primary}
-                </span>
-                <span className="text-[10px] text-muted-foreground">vs</span>
-                <span className={cn("text-sm font-semibold", stat.cClass)} title={comparisonName}>
-                  {stat.comparison}
-                </span>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-muted-foreground truncate max-w-[50%]" title={primaryName}>
+                    {truncate(primaryName, 16)}
+                  </span>
+                  <span className={cn("text-sm font-semibold", stat.pClass)}>
+                    {stat.primary}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-muted-foreground truncate max-w-[50%]" title={comparisonName}>
+                    {truncate(comparisonName, 16)}
+                  </span>
+                  <span className={cn("text-sm font-semibold", stat.cClass)}>
+                    {stat.comparison}
+                  </span>
+                </div>
               </div>
             </div>
           ))}

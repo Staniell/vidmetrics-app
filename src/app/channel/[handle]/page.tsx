@@ -16,6 +16,7 @@ import { LoadingState } from "@/components/loading-state"
 import { ErrorState } from "@/components/error-state"
 import { CompareStatCards } from "@/components/compare-stat-cards"
 import { CompareAggregates } from "@/components/compare-aggregates"
+import { CompareTopVideos } from "@/components/compare-top-videos"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -222,6 +223,18 @@ export default function ChannelPage() {
                         comparisonRangeVideos={comparison.rangeVideos}
                         primaryName={primary.channel.title}
                         comparisonName={comparison.channel.title}
+                      />
+                    )}
+
+                    {(primary.videos.length > 0 || comparison.videos.length > 0) && (
+                      <CompareTopVideos
+                        primaryVideos={primary.videos}
+                        comparisonVideos={comparison.videos}
+                        primaryRangeVideos={primary.rangeVideos}
+                        comparisonRangeVideos={comparison.rangeVideos}
+                        primaryName={primary.channel.title}
+                        comparisonName={comparison.channel.title}
+                        sort={activeSort}
                       />
                     )}
                   </div>
