@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model TrackedChannel {
+  id             String   @id // YouTube channel ID (UC...)
+  title          String
+  handle         String?
+  firstTrackedAt DateTime @default(now())
+  videos         TrackedVideo[]
+}
+
+model TrackedVideo {
+  id          String   @id // YouTube video ID
+  channelId   String
+  title       String
+  publishedAt DateTime
+  channel     TrackedChannel @relation(fields: [channelId], references: [id])
+  snapshots   ViewSnapshot[]
+
+  @@index([channelId])
+}
+
+model ViewSnapshot {
+  id           Int      @id @default(autoincrement())
+  videoId      String
+  viewCount    BigInt
+  likeCount    Int?
+  commentCount Int?
+  capturedAt   DateTime @default(now())
+  video        TrackedVideo @relation(fields: [videoId], references: [id])
+
+  @@unique([videoId, capturedAt])
+  @@index([videoId, capturedAt])
+  @@index([capturedAt])
+}
