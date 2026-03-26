@@ -179,12 +179,17 @@ export function HeroCarousel({ onSelect }: HeroCarouselProps) {
   }
 
   return (
-    <div
-      className="relative w-screen left-1/2 -translate-x-1/2 mt-20 select-none overflow-hidden"
-    >
-      <div className="space-y-3">
-        <MarqueeRow creators={data.row1} direction="left" speed={40} onSelect={onSelect} />
-        <MarqueeRow creators={data.row2} direction="right" speed={45} onSelect={onSelect} />
+    <div className="relative mt-20 select-none">
+      {/* Left fade — positioned relative to the normal-flow container */}
+      <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-[200px] bg-gradient-to-r from-background to-transparent" />
+      {/* Right fade */}
+      <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-[200px] bg-gradient-to-l from-background to-transparent" />
+      {/* Full-width carousel breaks out of container */}
+      <div className="relative w-screen left-1/2 -translate-x-1/2 overflow-hidden">
+        <div className="space-y-3">
+          <MarqueeRow creators={data.row1} direction="left" speed={40} onSelect={onSelect} />
+          <MarqueeRow creators={data.row2} direction="right" speed={45} onSelect={onSelect} />
+        </div>
       </div>
     </div>
   )

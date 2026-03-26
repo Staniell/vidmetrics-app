@@ -333,8 +333,8 @@ export default function HowItWorksPage() {
             />
             <TierBar
               label="Tier 2: Velocity"
-              badge="Live"
-              badgeClass="text-[10px] px-1.5 py-0 border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400"
+              badge="No badge"
+              badgeClass="text-[10px] px-1.5 py-0 text-muted-foreground"
               percent={65}
               color="bg-blue-500"
               delay="200ms"
@@ -342,8 +342,8 @@ export default function HowItWorksPage() {
             />
             <TierBar
               label="Tier 3: Tracked"
-              badge="Exact"
-              badgeClass="text-[10px] px-1.5 py-0 border-green-300 text-green-600 dark:border-green-700 dark:text-green-400"
+              badge="No badge"
+              badgeClass="text-[10px] px-1.5 py-0 text-muted-foreground"
               percent={100}
               color="bg-green-500"
               delay="400ms"
@@ -444,12 +444,9 @@ export default function HowItWorksPage() {
                   <div>
                     <h3 className="text-sm font-semibold">
                       Velocity{" "}
-                      <Badge
-                        variant="outline"
-                        className="ml-1 text-[10px] px-1.5 py-0 border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400"
-                      >
-                        Live
-                      </Badge>
+                      <span className="ml-1 text-xs text-muted-foreground font-normal">
+                        (no badge on video card)
+                      </span>
                     </h3>
                     <p className="text-xs text-muted-foreground">
                       Real measured rate, projected across the period
@@ -488,7 +485,7 @@ export default function HowItWorksPage() {
                       Auto-upgrade:
                     </span>{" "}
                     VidMetrics silently re-fetches after 10 minutes, capturing a
-                    second snapshot. Est. upgrades to Live automatically — just
+                    second snapshot. Est. badge disappears automatically — just
                     leave the page open.
                   </p>
                 </div>
@@ -567,13 +564,12 @@ export default function HowItWorksPage() {
 
           {/* Data source badges */}
           <h3 className="text-sm font-semibold mb-4">Data Source Badges</h3>
-          <div className="grid gap-3 sm:grid-cols-3 mb-10">
+          <div className="grid gap-3 sm:grid-cols-2 mb-10">
             <Card className="border-orange-500/20">
               <CardContent className="p-4 text-center">
                 <div className="flex items-center justify-center gap-1.5 mb-3">
-                  <TrendingUp className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                   <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-                    +45K views
+                    +45K views this period
                   </span>
                   <Badge
                     variant="outline"
@@ -583,27 +579,7 @@ export default function HowItWorksPage() {
                   </Badge>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Rough estimate from video age & total views
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-blue-500/20">
-              <CardContent className="p-4 text-center">
-                <div className="flex items-center justify-center gap-1.5 mb-3">
-                  <TrendingUp className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                  <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-                    +120K views
-                  </span>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-1.5 py-0 border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400"
-                  >
-                    Live
-                  </Badge>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Real velocity measured & projected
+                  Only shows for Estimated tier — rough guess from video age & total views
                 </p>
               </CardContent>
             </Card>
@@ -611,13 +587,12 @@ export default function HowItWorksPage() {
             <Card className="border-green-500/20">
               <CardContent className="p-4 text-center">
                 <div className="flex items-center justify-center gap-1.5 mb-3">
-                  <TrendingUp className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                   <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-                    +450K views
+                    +450K views this period
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Exact tracked count (no badge needed)
+                  Velocity & Tracked tiers — no badge, just the view count in green
                 </p>
               </CardContent>
             </Card>
@@ -868,7 +843,7 @@ export default function HowItWorksPage() {
                     <span className="font-semibold text-foreground">
                       Only real data
                     </span>{" "}
-                    — only shows for Live or Tracked tiers, never for Estimated
+                    — only shows for Velocity or Tracked tiers, never for Estimated
                   </p>
                 </div>
                 <div className="flex items-start gap-2">
@@ -1045,7 +1020,7 @@ export default function HowItWorksPage() {
               <FlowStep
                 icon={RefreshCw}
                 title="Silent re-fetch after 10 minutes"
-                description="A second snapshot is captured automatically, upgrading Estimated data to Velocity (Live) tier. No user action required. Over days, daily cron jobs push data to Tracked tier."
+                description="A second snapshot is captured automatically, upgrading Estimated data to Velocity tier. The Est. badge disappears. Over days, daily cron jobs push data to Tracked tier."
                 accent="bg-cyan-500/10 text-cyan-500"
                 isLast
               />

@@ -10,9 +10,9 @@ interface CompareStatCardsProps {
   comparison: ChannelInfo
 }
 
-function ChannelColumn({ channel, statClasses }: {
+export function ChannelColumn({ channel, statClasses }: {
   channel: ChannelInfo
-  statClasses: { subs: string; views: string; videos: string }
+  statClasses?: { subs: string; views: string; videos: string }
 }) {
   return (
     <Card className="flex-1">
@@ -35,19 +35,19 @@ function ChannelColumn({ channel, statClasses }: {
             icon={<Users className="h-3.5 w-3.5" />}
             label="Subscribers"
             value={channel.subscriberCount > 0 ? formatNumber(channel.subscriberCount) : "Hidden"}
-            className={statClasses.subs}
+            className={statClasses?.subs}
           />
           <StatCell
             icon={<Eye className="h-3.5 w-3.5" />}
             label="Total Views"
             value={formatNumber(channel.viewCount)}
-            className={statClasses.views}
+            className={statClasses?.views}
           />
           <StatCell
             icon={<Video className="h-3.5 w-3.5" />}
             label="Videos"
             value={formatNumber(channel.videoCount)}
-            className={statClasses.videos}
+            className={statClasses?.videos}
           />
           <StatCell
             icon={<Calendar className="h-3.5 w-3.5" />}

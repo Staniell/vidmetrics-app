@@ -39,3 +39,14 @@ model ViewSnapshot {
   @@index([videoId, capturedAt])
   @@index([capturedAt])
 }
+
+model AiInsightCache {
+  id                  String   @id @default(cuid())
+  channelId           String
+  comparisonChannelId String?
+  period              String
+  response            Json
+  generatedAt         DateTime @default(now())
+
+  @@index([channelId, comparisonChannelId, period, generatedAt])
+}

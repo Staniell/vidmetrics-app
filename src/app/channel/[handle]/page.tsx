@@ -9,6 +9,7 @@ import dynamic from "next/dynamic"
 import { useChannel } from "@/hooks/use-channel"
 import { parseChannelInput } from "@/lib/parse-channel-input"
 import { captureAndDownloadPdf, buildExportFilename } from "@/lib/pdf-export"
+import { buildChannelContext } from "@/lib/ai/context-builder"
 import { ChannelCard } from "@/components/channel-card"
 import { ChannelInput } from "@/components/channel-input"
 import { ChartsRow } from "@/components/charts-row"
@@ -16,9 +17,11 @@ import { FilterBar } from "@/components/filter-bar"
 import { VideoGrid } from "@/components/video-grid"
 import { LoadingState } from "@/components/loading-state"
 import { ErrorState } from "@/components/error-state"
-import { CompareStatCards } from "@/components/compare-stat-cards"
+import { CompareStatCards, ChannelColumn } from "@/components/compare-stat-cards"
 import { CompareAggregates } from "@/components/compare-aggregates"
 import { CompareTopVideos } from "@/components/compare-top-videos"
+import { AiInsightsPanel } from "@/components/ai/ai-insights-panel"
+import { AiChatPanel } from "@/components/ai/ai-chat-panel"
 import { PdfExportLayout } from "@/components/pdf-export-layout"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -175,6 +178,19 @@ export default function ChannelPage() {
     return result
   }, [comparison.rangeVideos, searchQuery, videoType, isComparing])
 
+  // AI chat panel
+  const [chatOpen, setChatOpen] = useState(false)
+
+  const condensedChannelData = useMemo(() => {
+    if (!primary.channel || primary.rangeVideos.length === 0) return null
+    return buildChannelContext(primary.channel, primary.videos, primary.rangeVideos)
+  }, [primary.channel, primary.videos, primary.rangeVideos])
+
+  const condensedComparisonData = useMemo(() => {
+    if (!isComparing || !comparison.channel || comparison.rangeVideos.length === 0) return null
+    return buildChannelContext(comparison.channel, comparison.videos, comparison.rangeVideos)
+  }, [isComparing, comparison.channel, comparison.videos, comparison.rangeVideos])
+
   // PDF export
   const [isExporting, setIsExporting] = useState(false)
   const [showExportLayout, setShowExportLayout] = useState(false)
@@ -264,7 +280,7 @@ export default function ChannelPage() {
               <div className="space-y-4">
                 {comparison.isLoading && !comparison.channel && (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <ChannelCard channel={primary.channel} />
+                    <ChannelColumn channel={primary.channel} />
                     <Skeleton className="h-full min-h-[200px] w-full rounded-xl" />
                   </div>
                 )}
@@ -283,6 +299,14 @@ export default function ChannelPage() {
             ) : (
               <ChannelCard channel={primary.channel} />
             )}
+
+            {/* AI Insights */}
+            <AiInsightsPanel
+              channelData={condensedChannelData}
+              comparisonData={condensedComparisonData}
+              period={activePeriod}
+              onOpenChat={() => setChatOpen(true)}
+            />
 
             {/* Comparison details (charts, aggregates, top videos) */}
             {isComparing && comparison.channel && (
@@ -381,6 +405,17 @@ export default function ChannelPage() {
           </>
         )}
       </div>
+
+      {/* AI Chat Panel */}
+      {primary.channel && (
+        <AiChatPanel
+          open={chatOpen}
+          onOpenChange={setChatOpen}
+          channelData={condensedChannelData}
+          comparisonData={condensedComparisonData}
+          channelHandle={primary.channel.handle}
+        />
+      )}
 
       {/* Off-screen PDF export layout — rendered via portal to avoid parent style interference */}
       {showExportLayout &&
