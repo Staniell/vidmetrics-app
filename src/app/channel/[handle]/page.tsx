@@ -1,17 +1,22 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { CircleHelp } from "lucide-react"
+import { useState, useMemo, useEffect, useCallback } from "react"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { CircleHelp, GitCompareArrows, X } from "lucide-react"
+import dynamic from "next/dynamic"
 import { useChannel } from "@/hooks/use-channel"
+import { parseChannelInput } from "@/lib/parse-channel-input"
 import { ChannelCard } from "@/components/channel-card"
-// import { TrendingCarousel } from "@/components/trending-carousel"
+import { ChannelInput } from "@/components/channel-input"
 import { ChartsRow } from "@/components/charts-row"
 import { FilterBar } from "@/components/filter-bar"
 import { VideoGrid } from "@/components/video-grid"
 import { LoadingState } from "@/components/loading-state"
 import { ErrorState } from "@/components/error-state"
+import { CompareStatCards } from "@/components/compare-stat-cards"
+import { CompareAggregates } from "@/components/compare-aggregates"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
   TooltipContent,
@@ -19,46 +24,124 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
+const CompareCharts = dynamic(
+  () => import("@/components/compare-charts").then((mod) => mod.CompareCharts),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Skeleton className="h-[320px] w-full rounded-xl" />
+        <Skeleton className="h-[320px] w-full rounded-xl" />
+      </div>
+    ),
+  }
+)
+
 export default function ChannelPage() {
   const { handle } = useParams<{ handle: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const decodedHandle = decodeURIComponent(handle)
+  const vsParam = searchParams.get("vs")
 
-  const {
-    channel,
-    videos,
-    rangeVideos,
-    isLoading,
-    error,
-    sort,
-    period,
-    rangeStart,
-    rangeEnd,
-    trackedSince,
-    nextPageToken,
-    fetchChannel,
-    fetchMoreVideos,
-    setSort,
-    setPeriod,
-    setCustomRange,
-    retry,
-  } = useChannel(decodedHandle)
+  // Lifted filter state shared between both channels when comparing
+  const [sharedSort, setSharedSort] = useState("views")
+  const [sharedPeriod, setSharedPeriod] = useState("30")
+  const [sharedRangeStart, setSharedRangeStart] = useState("")
+  const [sharedRangeEnd, setSharedRangeEnd] = useState("")
+
+  const setSharedCustomRange = useCallback((start: string, end: string) => {
+    setSharedPeriod("custom")
+    setSharedRangeStart(start)
+    setSharedRangeEnd(end)
+  }, [])
+
+  const [showCompareInput, setShowCompareInput] = useState(false)
+
+  const isComparing = !!vsParam
+
+  const primary = useChannel(
+    decodedHandle,
+    isComparing
+      ? {
+          externalSort: sharedSort,
+          externalPeriod: sharedPeriod,
+          externalRangeStart: sharedRangeStart || undefined,
+          externalRangeEnd: sharedRangeEnd || undefined,
+        }
+      : undefined
+  )
+
+  const comparison = useChannel(
+    isComparing ? vsParam : undefined,
+    isComparing
+      ? {
+          externalSort: sharedSort,
+          externalPeriod: sharedPeriod,
+          externalRangeStart: sharedRangeStart || undefined,
+          externalRangeEnd: sharedRangeEnd || undefined,
+        }
+      : undefined
+  )
+
+  // Initialize shared filters from primary when entering compare mode
+  useEffect(() => {
+    if (isComparing && !sharedRangeStart) {
+      setSharedSort(primary.sort)
+      setSharedPeriod(primary.period)
+      setSharedRangeStart(primary.rangeStart)
+      setSharedRangeEnd(primary.rangeEnd)
+    }
+  }, [isComparing]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Normalize URL to match canonical handle from API
   useEffect(() => {
-    if (channel?.handle) {
-      const canonical = channel.handle.replace(/^@/, "")
+    if (primary.channel?.handle) {
+      const canonical = primary.channel.handle.replace(/^@/, "")
       if (canonical !== decodedHandle) {
-        router.replace(`/channel/${canonical}`)
+        const vsQuery = vsParam ? `?vs=${vsParam}` : ""
+        router.replace(`/channel/${canonical}${vsQuery}`)
       }
     }
-  }, [channel?.handle, decodedHandle, router])
+  }, [primary.channel?.handle, decodedHandle, vsParam, router])
+
+  const handleCompareSubmit = useCallback(
+    async (input: string) => {
+      const parsed = parseChannelInput(input)
+      if (!parsed) return
+
+      let compareHandle: string
+      if (parsed.type === "handle") {
+        compareHandle = parsed.value.replace(/^@/, "")
+      } else {
+        try {
+          const res = await fetch(`/api/channel?handle=${encodeURIComponent(input)}`)
+          if (res.ok) {
+            const data = await res.json()
+            compareHandle = data.channel?.handle?.replace(/^@/, "") || parsed.value
+          } else {
+            compareHandle = parsed.value
+          }
+        } catch {
+          compareHandle = parsed.value
+        }
+      }
+
+      setShowCompareInput(false)
+      router.push(`/channel/${decodedHandle}?vs=${compareHandle}`)
+    },
+    [router, decodedHandle]
+  )
+
+  const handleRemoveComparison = useCallback(() => {
+    router.push(`/channel/${decodedHandle}`)
+  }, [router, decodedHandle])
 
   const [searchQuery, setSearchQuery] = useState("")
   const [videoType, setVideoType] = useState("all")
 
   const filteredVideos = useMemo(() => {
-    let result = videos
+    let result = primary.videos
     if (videoType !== "all") {
       result = result.filter((v) => v.videoType === videoType)
     }
@@ -67,10 +150,10 @@ export default function ChannelPage() {
       result = result.filter((v) => v.title.toLowerCase().includes(q))
     }
     return result
-  }, [videos, searchQuery, videoType])
+  }, [primary.videos, searchQuery, videoType])
 
   const filteredRangeVideos = useMemo(() => {
-    let result = rangeVideos
+    let result = primary.rangeVideos
     if (videoType !== "all") {
       result = result.filter((v) => v.videoType === videoType)
     }
@@ -79,49 +162,118 @@ export default function ChannelPage() {
       result = result.filter((v) => v.title.toLowerCase().includes(q))
     }
     return result
-  }, [rangeVideos, searchQuery, videoType])
+  }, [primary.rangeVideos, searchQuery, videoType])
+
+  const activeSort = isComparing ? sharedSort : primary.sort
+  const activePeriod = isComparing ? sharedPeriod : primary.period
+  const activeRangeStart = isComparing ? sharedRangeStart : primary.rangeStart
+  const activeRangeEnd = isComparing ? sharedRangeEnd : primary.rangeEnd
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 pb-12">
       <div className="space-y-6 pt-6">
-        {isLoading && !channel && <LoadingState />}
+        {primary.isLoading && !primary.channel && <LoadingState />}
 
-        {error && <ErrorState message={error} onRetry={retry} />}
+        {primary.error && <ErrorState message={primary.error} onRetry={primary.retry} />}
 
-        {channel && (
+        {primary.channel && (
           <>
-            <ChannelCard channel={channel} />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1 min-w-0">
+                <ChannelCard channel={primary.channel} />
+              </div>
+              <div className="flex items-center gap-2 shrink-0 sm:pt-2">
+                {isComparing ? (
+                  <Button variant="outline" size="sm" onClick={handleRemoveComparison}>
+                    <X className="h-4 w-4 mr-1" />
+                    Remove
+                  </Button>
+                ) : showCompareInput ? (
+                  <div className="flex items-center gap-2">
+                    <ChannelInput onSubmit={handleCompareSubmit} compact />
+                    <Button variant="ghost" size="sm" onClick={() => setShowCompareInput(false)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setShowCompareInput(true)}>
+                    <GitCompareArrows className="h-4 w-4 mr-1" />
+                    Compare
+                  </Button>
+                )}
+              </div>
+            </div>
 
-            {/* {rangeVideos.length > 0 && (
-              <TrendingCarousel videos={rangeVideos} />
-            )} */}
+            {/* Comparison section */}
+            {isComparing && (
+              <>
+                {comparison.isLoading && !comparison.channel && (
+                  <div className="space-y-4">
+                    <Skeleton className="h-[200px] w-full rounded-xl" />
+                  </div>
+                )}
 
-            {videos.length > 0 && <ChartsRow videos={videos} />}
+                {comparison.error && (
+                  <ErrorState message={comparison.error} onRetry={comparison.retry} />
+                )}
+
+                {comparison.channel && (
+                  <div className="space-y-6">
+                    <CompareStatCards
+                      primary={primary.channel}
+                      comparison={comparison.channel}
+                    />
+
+                    {primary.videos.length > 0 && comparison.videos.length > 0 && (
+                      <CompareCharts
+                        primaryVideos={primary.videos}
+                        comparisonVideos={comparison.videos}
+                        primaryName={primary.channel.title}
+                        comparisonName={comparison.channel.title}
+                      />
+                    )}
+
+                    {(primary.rangeVideos.length > 0 || comparison.rangeVideos.length > 0) && (
+                      <CompareAggregates
+                        primaryVideos={primary.videos}
+                        comparisonVideos={comparison.videos}
+                        primaryRangeVideos={primary.rangeVideos}
+                        comparisonRangeVideos={comparison.rangeVideos}
+                        primaryName={primary.channel.title}
+                        comparisonName={comparison.channel.title}
+                      />
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {primary.videos.length > 0 && <ChartsRow videos={primary.videos} />}
 
             <FilterBar
-              sort={sort}
-              period={period}
-              rangeStart={rangeStart}
-              rangeEnd={rangeEnd}
+              sort={activeSort}
+              period={activePeriod}
+              rangeStart={activeRangeStart}
+              rangeEnd={activeRangeEnd}
               videoType={videoType}
               searchQuery={searchQuery}
-              onSortChange={setSort}
-              onPeriodChange={setPeriod}
-              onCustomRangeChange={setCustomRange}
+              onSortChange={isComparing ? setSharedSort : primary.setSort}
+              onPeriodChange={isComparing ? setSharedPeriod : primary.setPeriod}
+              onCustomRangeChange={isComparing ? setSharedCustomRange : primary.setCustomRange}
               onVideoTypeChange={setVideoType}
               onSearchChange={setSearchQuery}
             />
 
-            {rangeVideos.length > 0 && (() => {
-              const hasEstimated = rangeVideos.some((v) => v.dataSource === "estimated")
-              const hasVelocity = rangeVideos.some((v) => v.dataSource === "velocity")
-              const allTracked = rangeVideos.every((v) => v.dataSource === "tracked")
+            {primary.rangeVideos.length > 0 && (() => {
+              const hasEstimated = primary.rangeVideos.some((v) => v.dataSource === "estimated")
+              const hasVelocity = primary.rangeVideos.some((v) => v.dataSource === "velocity")
+              const allTracked = primary.rangeVideos.every((v) => v.dataSource === "tracked")
 
               let text = ""
               let tooltipText = ""
 
-              if (allTracked && trackedSince) {
-                text = `Tracking since ${new Date(trackedSince).toLocaleDateString()}`
+              if (allTracked && primary.trackedSince) {
+                text = `Tracking since ${new Date(primary.trackedSince).toLocaleDateString()}`
                 tooltipText = "View counts are based on exact snapshots recorded over the selected date range."
               } else if (hasVelocity) {
                 text = "Based on live view velocity — accuracy improves over time."
@@ -153,17 +305,17 @@ export default function ChannelPage() {
             <VideoGrid
               videos={filteredVideos}
               rangeVideos={filteredRangeVideos}
-              sortByRange={sort === "viewsInRange"}
+              sortByRange={activeSort === "viewsInRange"}
             />
 
-            {nextPageToken && !searchQuery && sort !== "viewsInRange" && (
+            {primary.nextPageToken && !searchQuery && activeSort !== "viewsInRange" && (
               <div className="flex justify-center pt-4">
                 <Button
                   variant="outline"
-                  onClick={fetchMoreVideos}
-                  disabled={isLoading}
+                  onClick={primary.fetchMoreVideos}
+                  disabled={primary.isLoading}
                 >
-                  {isLoading ? "Loading..." : "Load More"}
+                  {primary.isLoading ? "Loading..." : "Load More"}
                 </Button>
               </div>
             )}
