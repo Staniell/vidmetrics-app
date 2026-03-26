@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { subDays, format } from "date-fns"
-import { CircleHelp, FileDown, GitCompareArrows, Loader2, X } from "lucide-react"
+import { ChevronDown, CircleHelp, FileDown, GitCompareArrows, Loader2, X } from "lucide-react"
 import dynamic from "next/dynamic"
 import { useChannel } from "@/hooks/use-channel"
 import { parseChannelInput } from "@/lib/parse-channel-input"
@@ -20,8 +20,9 @@ import { ErrorState } from "@/components/error-state"
 import { CompareStatCards, ChannelColumn } from "@/components/compare-stat-cards"
 import { CompareAggregates } from "@/components/compare-aggregates"
 import { CompareTopVideos } from "@/components/compare-top-videos"
-import { AiInsightsPanel } from "@/components/ai/ai-insights-panel"
-import { AiChatPanel } from "@/components/ai/ai-chat-panel"
+import { AiInsightsButton } from "@/components/ai/ai-insights-button"
+import { AiInsightsModal } from "@/components/ai/ai-insights-modal"
+import { useAiInsights } from "@/hooks/use-ai-insights"
 import { PdfExportLayout } from "@/components/pdf-export-layout"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -127,6 +128,7 @@ export default function ChannelPage() {
 
   const [searchQuery, setSearchQuery] = useState("")
   const [videoType, setVideoType] = useState("all")
+  const [toolbarOpen, setToolbarOpen] = useState(false)
 
   const filteredVideos = useMemo(() => {
     let result = primary.videos
@@ -178,8 +180,8 @@ export default function ChannelPage() {
     return result
   }, [comparison.rangeVideos, searchQuery, videoType, isComparing])
 
-  // AI chat panel
-  const [chatOpen, setChatOpen] = useState(false)
+  // AI insights modal
+  const [aiModalOpen, setAiModalOpen] = useState(false)
 
   const condensedChannelData = useMemo(() => {
     if (!primary.channel || primary.rangeVideos.length === 0) return null
@@ -223,6 +225,15 @@ export default function ChannelPage() {
   const activeRangeStart = isComparing ? sharedRangeStart : primary.rangeStart
   const activeRangeEnd = isComparing ? sharedRangeEnd : primary.rangeEnd
 
+  const isRangeSort = activeSort === "viewsInRange" || activeSort === "viewsInRange_asc"
+
+  const { insights: aiInsights, isLoading: aiLoading, error: aiError, refresh: aiRefresh, fetch: aiFetch } = useAiInsights(condensedChannelData, condensedComparisonData, activePeriod)
+
+  const handleAiOpen = useCallback(() => {
+    aiFetch()
+    setAiModalOpen(true)
+  }, [aiFetch])
+
   return (
     <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 pb-12">
       <div className="space-y-6 pt-6">
@@ -233,8 +244,65 @@ export default function ChannelPage() {
         {primary.channel && (
           <>
             {/* Sticky toolbar: filters + action buttons */}
-            <div className="sticky top-14 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="sticky top-14 z-40 -mx-4 sm:-mx-6 lg:-mx-8 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+              {/* Mobile: toggle row + collapsible filters */}
+              <div className="sm:hidden">
+                <div className="flex items-center justify-between px-4 py-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting} className="shrink-0">
+                      {isExporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileDown className="h-4 w-4 mr-1" />}
+                      {isExporting ? "Exporting..." : "Export"}
+                    </Button>
+                    {isComparing ? (
+                      <Button variant="outline" size="sm" onClick={handleRemoveComparison} className="shrink-0">
+                        <X className="h-4 w-4 mr-1" />
+                        Remove
+                      </Button>
+                    ) : showCompareInput ? (
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="min-w-0 flex-1">
+                          <ChannelInput onSubmit={handleCompareSubmit} compact />
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => setShowCompareInput(false)} className="shrink-0">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" onClick={() => setShowCompareInput(true)} className="shrink-0">
+                        <GitCompareArrows className="h-4 w-4 mr-1" />
+                        Compare
+                      </Button>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setToolbarOpen((prev) => !prev)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                  >
+                    Filters
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${toolbarOpen ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
+                {toolbarOpen && (
+                  <div className="px-4 pb-3">
+                    <FilterBar
+                      sort={activeSort}
+                      period={activePeriod}
+                      rangeStart={activeRangeStart}
+                      rangeEnd={activeRangeEnd}
+                      videoType={videoType}
+                      searchQuery={searchQuery}
+                      onSortChange={isComparing ? setSharedSort : primary.setSort}
+                      onPeriodChange={isComparing ? setSharedPeriod : primary.setPeriod}
+                      onCustomRangeChange={isComparing ? setSharedCustomRange : primary.setCustomRange}
+                      onVideoTypeChange={setVideoType}
+                      onSearchChange={setSearchQuery}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop: inline filters + actions */}
+              <div className="hidden sm:flex items-center justify-between px-6 lg:px-8 py-3">
                 <FilterBar
                   sort={activeSort}
                   period={activePeriod}
@@ -300,14 +368,6 @@ export default function ChannelPage() {
               <ChannelCard channel={primary.channel} />
             )}
 
-            {/* AI Insights */}
-            <AiInsightsPanel
-              channelData={condensedChannelData}
-              comparisonData={condensedComparisonData}
-              period={activePeriod}
-              onOpenChat={() => setChatOpen(true)}
-            />
-
             {/* Comparison details (charts, aggregates, top videos) */}
             {isComparing && comparison.channel && (
               <div className="space-y-6">
@@ -342,6 +402,13 @@ export default function ChannelPage() {
                     sort={activeSort}
                   />
                 )}
+              </div>
+            )}
+
+            {primary.isVideosLoading && primary.videos.length === 0 && (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <Skeleton className="h-[320px] w-full rounded-xl" />
+                <Skeleton className="h-[320px] w-full rounded-xl" />
               </div>
             )}
 
@@ -385,20 +452,29 @@ export default function ChannelPage() {
               )
             })()}
 
-            <VideoGrid
-              videos={filteredVideos}
-              rangeVideos={filteredRangeVideos}
-              sortByRange={activeSort === "viewsInRange"}
-            />
+            {(primary.isVideosLoading && primary.videos.length === 0) || (primary.isRangeLoading && isRangeSort) ? (
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-[280px] w-full rounded-xl" />
+                ))}
+              </div>
+            ) : (
+              <VideoGrid
+                videos={filteredVideos}
+                rangeVideos={filteredRangeVideos}
+                sortByRange={isRangeSort}
+                sortAsc={activeSort.endsWith("_asc")}
+              />
+            )}
 
             {primary.nextPageToken && !searchQuery && activeSort !== "viewsInRange" && (
               <div className="flex justify-center pt-4">
                 <Button
                   variant="outline"
                   onClick={primary.fetchMoreVideos}
-                  disabled={primary.isLoading}
+                  disabled={primary.isVideosLoading}
                 >
-                  {primary.isLoading ? "Loading..." : "Load More"}
+                  {primary.isVideosLoading ? "Loading..." : "Load More"}
                 </Button>
               </div>
             )}
@@ -406,16 +482,24 @@ export default function ChannelPage() {
         )}
       </div>
 
-      {/* AI Chat Panel */}
-      {primary.channel && (
-        <AiChatPanel
-          open={chatOpen}
-          onOpenChange={setChatOpen}
-          channelData={condensedChannelData}
-          comparisonData={condensedComparisonData}
-          channelHandle={primary.channel.handle}
-        />
-      )}
+      {/* AI Insights floating button + modal */}
+      <AiInsightsButton
+        visible={!!condensedChannelData}
+        isLoading={aiLoading && !aiInsights}
+        onClick={handleAiOpen}
+      />
+      <AiInsightsModal
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        channelData={condensedChannelData}
+        comparisonData={condensedComparisonData}
+        period={activePeriod}
+        channelHandle={primary.channel?.handle ?? ""}
+        insights={aiInsights}
+        isLoading={aiLoading}
+        error={aiError}
+        onRefresh={aiRefresh}
+      />
 
       {/* Off-screen PDF export layout — rendered via portal to avoid parent style interference */}
       {showExportLayout &&

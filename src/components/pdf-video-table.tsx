@@ -33,9 +33,13 @@ function mergeVideoData(
 ): MergedRow[] {
   const rangeMap = new Map(rangeVideos.map((rv) => [rv.videoId, rv]))
 
-  if (sort === "viewsInRange" && rangeVideos.length > 0) {
+  const sortField = sort.endsWith("_asc") ? sort.slice(0, -4) : sort
+  const sortAsc = sort.endsWith("_asc")
+
+  if (sortField === "viewsInRange" && rangeVideos.length > 0) {
     const videoMap = new Map(videos.map((v) => [v.id, v]))
-    return rangeVideos.slice(0, 50).map((rv) => {
+    const ordered = sortAsc ? [...rangeVideos].reverse() : rangeVideos
+    return ordered.slice(0, 50).map((rv) => {
       const base = videoMap.get(rv.videoId)
       return {
         title: rv.title,

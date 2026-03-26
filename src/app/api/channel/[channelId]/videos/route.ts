@@ -10,29 +10,33 @@ import type { VideoMetrics } from "@/types"
 
 type SortField = "views" | "likes" | "comments" | "date" | "engagement"
 
-function sortVideos(videos: VideoMetrics[], sort: SortField): VideoMetrics[] {
+function parseSortParam(sort: string): { field: SortField; asc: boolean } {
+  const asc = sort.endsWith("_asc")
+  const field = (asc ? sort.slice(0, -4) : sort) as SortField
+  return { field, asc }
+}
+
+function sortVideos(videos: VideoMetrics[], field: SortField, asc: boolean): VideoMetrics[] {
+  const dir = asc ? 1 : -1
   return [...videos].sort((a, b) => {
-    switch (sort) {
+    switch (field) {
       case "views":
-        return b.viewCount - a.viewCount
+        return dir * (a.viewCount - b.viewCount)
       case "likes":
-        return b.likeCount - a.likeCount
+        return dir * (a.likeCount - b.likeCount)
       case "comments":
-        return b.commentCount - a.commentCount
+        return dir * (a.commentCount - b.commentCount)
       case "date":
-        return (
-          new Date(b.publishedAt).getTime() -
-          new Date(a.publishedAt).getTime()
-        )
+        return dir * (new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime())
       case "engagement":
-        return b.engagementRate - a.engagementRate
+        return dir * (a.engagementRate - b.engagementRate)
       default:
         return 0
     }
   })
 }
 
-const VALID_SORTS = new Set<string>(["views", "likes", "comments", "date", "engagement"])
+const VALID_SORT_FIELDS = new Set<string>(["views", "likes", "comments", "date", "engagement"])
 
 export async function GET(
   request: NextRequest,
@@ -50,15 +54,15 @@ export async function GET(
 
   const searchParams = request.nextUrl.searchParams
   const sortParam = searchParams.get("sort") || "date"
+  const { field: sortField, asc: sortAsc } = parseSortParam(sortParam)
 
-  if (!VALID_SORTS.has(sortParam)) {
+  if (!VALID_SORT_FIELDS.has(sortField)) {
     return NextResponse.json(
       { error: "Invalid sort parameter", code: "BAD_REQUEST" },
       { status: 400 }
     )
   }
 
-  const sort = sortParam as SortField
   const period = searchParams.get("period") || "30"
   const pageToken = searchParams.get("pageToken") || undefined
 
@@ -75,7 +79,7 @@ export async function GET(
     )
 
     const videos = await fetchVideoDetails(videoIds)
-    const sorted = sortVideos(videos, sort)
+    const sorted = sortVideos(videos, sortField, sortAsc)
 
     // Capture snapshots in the background (don't block response)
     captureSnapshots(channelId, videos).catch(() => {})

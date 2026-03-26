@@ -17,16 +17,22 @@ interface CompareTopVideosProps {
   sort: string
 }
 
+function parseSortKey(sort: string): { field: string; asc: boolean } {
+  if (sort.endsWith("_asc")) return { field: sort.slice(0, -4), asc: true }
+  return { field: sort, asc: false }
+}
+
 function sortVideos(
   videos: VideoMetrics[],
   rangeVideos: VideoViewDelta[],
   sort: string
 ): VideoMetrics[] {
-  const rangeMap = new Map(rangeVideos.map((rv) => [rv.videoId, rv]))
+  const { field, asc } = parseSortKey(sort)
 
-  if (sort === "viewsInRange") {
-    // Sort by views in range using rangeVideos order (already sorted by API)
-    return rangeVideos.slice(0, 10).map((rv) => {
+  if (field === "viewsInRange") {
+    // rangeVideos comes pre-sorted desc from API; reverse for asc
+    const ordered = asc ? [...rangeVideos].reverse() : rangeVideos
+    return ordered.slice(0, 10).map((rv) => {
       const video = videos.find((v) => v.id === rv.videoId)
       return video ?? {
         id: rv.videoId,
@@ -43,23 +49,24 @@ function sortVideos(
     })
   }
 
+  const dir = asc ? 1 : -1
   const sorted = [...videos]
-  switch (sort) {
+  switch (field) {
     case "likes":
-      sorted.sort((a, b) => b.likeCount - a.likeCount)
+      sorted.sort((a, b) => dir * (a.likeCount - b.likeCount))
       break
     case "comments":
-      sorted.sort((a, b) => b.commentCount - a.commentCount)
+      sorted.sort((a, b) => dir * (a.commentCount - b.commentCount))
       break
     case "date":
-      sorted.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      sorted.sort((a, b) => dir * (new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime()))
       break
     case "engagement":
-      sorted.sort((a, b) => b.engagementRate - a.engagementRate)
+      sorted.sort((a, b) => dir * (a.engagementRate - b.engagementRate))
       break
     case "views":
     default:
-      sorted.sort((a, b) => b.viewCount - a.viewCount)
+      sorted.sort((a, b) => dir * (a.viewCount - b.viewCount))
       break
   }
 
@@ -77,8 +84,10 @@ function VideoRow({
   rangeData?: VideoViewDelta
   sort: string
 }) {
+  const { field } = parseSortKey(sort)
+
   const statValue = (() => {
-    switch (sort) {
+    switch (field) {
       case "viewsInRange":
         return rangeData ? `+${formatNumber(rangeData.viewsInRange)}` : "-"
       case "likes":
@@ -96,7 +105,7 @@ function VideoRow({
   })()
 
   const statLabel = (() => {
-    switch (sort) {
+    switch (field) {
       case "viewsInRange": return "in period"
       case "likes": return "likes"
       case "comments": return "comments"
@@ -132,6 +141,7 @@ function VideoRow({
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium leading-tight line-clamp-2">{video.title}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">{formatRelativeAge(video.publishedAt)}</p>
       </div>
       <div className="text-right shrink-0">
         <p className="text-xs font-semibold">{statValue}</p>

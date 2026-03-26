@@ -29,6 +29,28 @@ interface ChannelInputProps {
   compact?: boolean
 }
 
+const RECENT_SEARCHES_KEY = "vidmetrics-recent-searches"
+const MAX_RECENT = 10
+
+function getRecentSearches(): SearchResult[] {
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveRecentSearch(result: SearchResult): SearchResult[] {
+  const current = getRecentSearches()
+  const filtered = current.filter((r) => r.id !== result.id)
+  const updated = [result, ...filtered].slice(0, MAX_RECENT)
+  try {
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated))
+  } catch {}
+  return updated
+}
+
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value)
   useEffect(() => {
@@ -168,6 +190,66 @@ function SearchDropdown({
   )
 }
 
+function RecentSearchesDropdown({
+  recentSearches,
+  onSelect,
+  activeIndex,
+}: {
+  recentSearches: SearchResult[]
+  onSelect: (result: SearchResult) => void
+  activeIndex: number
+}) {
+  if (recentSearches.length === 0) return null
+
+  return (
+    <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-lg border bg-popover shadow-lg overflow-hidden">
+      <div className="px-3 pt-2.5 pb-1.5 text-xs font-medium text-muted-foreground">
+        Recent
+      </div>
+      <ul role="listbox" className="max-h-[320px] overflow-y-auto">
+        {recentSearches.map((result, index) => (
+          <li
+            key={result.id}
+            role="option"
+            aria-selected={index === activeIndex}
+            className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
+              index === activeIndex
+                ? "bg-accent text-accent-foreground"
+                : "hover:bg-accent/50"
+            }`}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              onSelect(result)
+            }}
+          >
+            <ChannelAvatar
+              title={result.title}
+              thumbnailUrl={result.thumbnailUrl}
+              size={36}
+            />
+            <div className="flex flex-col min-w-0">
+              <span className="font-medium truncate text-sm">
+                {result.title}
+              </span>
+              <span className="text-xs text-muted-foreground truncate">
+                {result.handle && <span>{result.handle}</span>}
+                {result.handle && result.subscriberCount > 0 && (
+                  <span> &middot; </span>
+                )}
+                {result.subscriberCount > 0 && (
+                  <span>
+                    {formatNumber(result.subscriberCount)} subscribers
+                  </span>
+                )}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function ChannelInput({
   onSubmit,
   isLoading,
@@ -178,10 +260,16 @@ export function ChannelInput({
   const [isSearching, setIsSearching] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
+  const [recentSearches, setRecentSearches] = useState<SearchResult[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const debouncedValue = useDebounce(value, 300)
+
+  // Load recent searches from localStorage on mount
+  useEffect(() => {
+    setRecentSearches(getRecentSearches())
+  }, [])
 
   // Fetch search results when debounced value changes
   useEffect(() => {
@@ -246,6 +334,7 @@ export function ChannelInput({
       setValue(result.handle || result.title)
       setShowDropdown(false)
       setResults([])
+      setRecentSearches(saveRecentSearch(result))
       onSubmit(result.handle || result.id)
     },
     [onSubmit]
@@ -265,21 +354,22 @@ export function ChannelInput({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (!showDropdown || results.length === 0) return
+    const activeList = value.trim() ? results : recentSearches
+    if (!showDropdown || activeList.length === 0) return
 
     if (e.key === "ArrowDown") {
       e.preventDefault()
       setActiveIndex((prev) =>
-        prev < results.length - 1 ? prev + 1 : 0
+        prev < activeList.length - 1 ? prev + 1 : 0
       )
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
       setActiveIndex((prev) =>
-        prev > 0 ? prev - 1 : results.length - 1
+        prev > 0 ? prev - 1 : activeList.length - 1
       )
     } else if (e.key === "Enter" && activeIndex >= 0) {
       e.preventDefault()
-      handleSelect(results[activeIndex])
+      handleSelect(activeList[activeIndex])
     } else if (e.key === "Escape") {
       setShowDropdown(false)
       setActiveIndex(-1)
@@ -291,8 +381,8 @@ export function ChannelInput({
     setActiveIndex(-1)
     if (!newValue.trim()) {
       setResults([])
-      setShowDropdown(false)
       setIsSearching(false)
+      setShowDropdown(recentSearches.length > 0)
     }
   }
 
@@ -305,8 +395,11 @@ export function ChannelInput({
             value={value}
             onChange={(e) => handleChange(e.target.value)}
             onFocus={() => {
-              if (results.length > 0 || (value.trim().length >= 2 && !isLikelyUrl(value)))
+              if (!value.trim() && recentSearches.length > 0) {
                 setShowDropdown(true)
+              } else if (results.length > 0 || (value.trim().length >= 2 && !isLikelyUrl(value))) {
+                setShowDropdown(true)
+              }
             }}
             onKeyDown={handleKeyDown}
             placeholder="Search channel or paste URL"
@@ -316,7 +409,14 @@ export function ChannelInput({
             aria-expanded={showDropdown}
             aria-autocomplete="list"
           />
-          {showDropdown && (
+          {showDropdown && !value.trim() && recentSearches.length > 0 && (
+            <RecentSearchesDropdown
+              recentSearches={recentSearches}
+              onSelect={handleSelect}
+              activeIndex={activeIndex}
+            />
+          )}
+          {showDropdown && value.trim() && (
             <SearchDropdown
               results={results}
               isSearching={isSearching}
@@ -352,8 +452,11 @@ export function ChannelInput({
             value={value}
             onChange={(e) => handleChange(e.target.value)}
             onFocus={() => {
-              if (results.length > 0 || (value.trim().length >= 2 && !isLikelyUrl(value)))
+              if (!value.trim() && recentSearches.length > 0) {
                 setShowDropdown(true)
+              } else if (results.length > 0 || (value.trim().length >= 2 && !isLikelyUrl(value))) {
+                setShowDropdown(true)
+              }
             }}
             onKeyDown={handleKeyDown}
             placeholder="Search a YouTube channel or paste URL"
@@ -363,7 +466,14 @@ export function ChannelInput({
             aria-expanded={showDropdown}
             aria-autocomplete="list"
           />
-          {showDropdown && (
+          {showDropdown && !value.trim() && recentSearches.length > 0 && (
+            <RecentSearchesDropdown
+              recentSearches={recentSearches}
+              onSelect={handleSelect}
+              activeIndex={activeIndex}
+            />
+          )}
+          {showDropdown && value.trim() && (
             <SearchDropdown
               results={results}
               isSearching={isSearching}

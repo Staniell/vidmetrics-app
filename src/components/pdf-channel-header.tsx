@@ -13,11 +13,17 @@ interface PdfChannelHeaderProps {
 
 const SORT_LABELS: Record<string, string> = {
   views: "Most Views",
+  views_asc: "Least Views",
   viewsInRange: "Views This Period",
+  viewsInRange_asc: "Least Views This Period",
   likes: "Most Likes",
+  likes_asc: "Least Likes",
   comments: "Most Comments",
+  comments_asc: "Least Comments",
   date: "Newest",
+  date_asc: "Oldest",
   engagement: "Top Engagement",
+  engagement_asc: "Lowest Engagement",
 }
 
 const PERIOD_LABELS: Record<string, string> = {

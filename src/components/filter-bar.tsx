@@ -2,7 +2,8 @@
 
 import { useState, useRef } from "react"
 import { parseISO } from "date-fns"
-import { Search } from "lucide-react"
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, Search } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -83,21 +84,43 @@ export function FilterBar({
   // Show "custom" as the Select value only after applying; otherwise keep the previous preset visible
   const selectValue = period === "custom" && !customApplied ? "custom" : period
 
+  const sortField = sort.endsWith("_asc") ? sort.slice(0, -4) : sort
+  const sortAsc = sort.endsWith("_asc")
+
+  function handleSortFieldChange(field: string) {
+    onSortChange(sortAsc ? `${field}_asc` : field)
+  }
+
+  function handleToggleDirection() {
+    onSortChange(sortAsc ? sortField : `${sortField}_asc`)
+  }
+
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <Select value={sort} onValueChange={onSortChange}>
-        <SelectTrigger className="w-full sm:w-[180px]">
-          <SelectValue placeholder="Sort by" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="views">Most Views</SelectItem>
-          <SelectItem value="viewsInRange">Views This Period</SelectItem>
-          <SelectItem value="likes">Most Likes</SelectItem>
-          <SelectItem value="comments">Most Comments</SelectItem>
-          <SelectItem value="date">Newest</SelectItem>
-          <SelectItem value="engagement">Top Engagement</SelectItem>
-        </SelectContent>
-      </Select>
+      <div className="flex gap-1">
+        <Select value={sortField} onValueChange={handleSortFieldChange}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="views">Views</SelectItem>
+            <SelectItem value="viewsInRange">Views This Period</SelectItem>
+            <SelectItem value="likes">Likes</SelectItem>
+            <SelectItem value="comments">Comments</SelectItem>
+            <SelectItem value="date">Date</SelectItem>
+            <SelectItem value="engagement">Engagement</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          variant="outline"
+          size="icon"
+          className="shrink-0"
+          onClick={handleToggleDirection}
+          title={sortAsc ? "Ascending (click for descending)" : "Descending (click for ascending)"}
+        >
+          {sortAsc ? <ArrowUpNarrowWide className="h-4 w-4" /> : <ArrowDownWideNarrow className="h-4 w-4" />}
+        </Button>
+      </div>
 
       <DateRangePicker
         from={customFrom}

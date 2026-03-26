@@ -5,6 +5,22 @@ import { subDays, format } from "date-fns"
 import { parseChannelInput } from "@/lib/parse-channel-input"
 import type { ChannelInfo, VideoMetrics, VideoViewDelta } from "@/types"
 
+function sortClientSide(videos: VideoMetrics[], sort: string): VideoMetrics[] {
+  const asc = sort.endsWith("_asc")
+  const field = asc ? sort.slice(0, -4) : sort
+  const dir = asc ? 1 : -1
+  return [...videos].sort((a, b) => {
+    switch (field) {
+      case "views": return dir * (a.viewCount - b.viewCount)
+      case "likes": return dir * (a.likeCount - b.likeCount)
+      case "comments": return dir * (a.commentCount - b.commentCount)
+      case "date": return dir * (new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime())
+      case "engagement": return dir * (a.engagementRate - b.engagementRate)
+      default: return 0
+    }
+  })
+}
+
 function rangeDatesFromPeriod(period: string): { start: string; end: string } {
   const today = new Date()
   const end = format(today, "yyyy-MM-dd")
@@ -18,6 +34,8 @@ interface UseChannelReturn {
   videos: VideoMetrics[]
   rangeVideos: VideoViewDelta[]
   isLoading: boolean
+  isVideosLoading: boolean
+  isRangeLoading: boolean
   error: string | null
   sort: string
   period: string
@@ -88,6 +106,8 @@ export function useChannel(initialHandle?: string, options?: UseChannelOptions):
   const [videos, setVideos] = useState<VideoMetrics[]>([])
   const [rangeVideos, setRangeVideos] = useState<VideoViewDelta[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isVideosLoading, setIsVideosLoading] = useState(false)
+  const [isRangeLoading, setIsRangeLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sort, setSort] = useState("views")
   const [period, setPeriod] = useState("30")
@@ -101,7 +121,6 @@ export function useChannel(initialHandle?: string, options?: UseChannelOptions):
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Skip the refetch effect when fetchChannel already loaded videos
   const skipNextEffectRef = useRef(false)
-  const skipNextRangeEffectRef = useRef(false)
 
   // When external overrides are provided (comparison mode), use those; otherwise fall back to internal state
   const effectiveSort = options?.externalSort ?? sort
@@ -159,42 +178,26 @@ export function useChannel(initialHandle?: string, options?: UseChannelOptions):
 
         const channelData = await channelRes.json()
 
-        const [videosData, rangeData] = await Promise.all([
-          fetchVideosApi(
-            channelData.channel.id,
-            sortRef.current,
-            periodRef.current,
-            controller.signal
-          ),
-          fetchViewsInRangeApi(
-            channelData.channel.id,
-            rangeStartRef.current,
-            rangeEndRef.current,
-            controller.signal
-          ),
-        ])
-
-        // Skip the next effect trigger since we just loaded videos
+        // Show channel card immediately, then load videos
         skipNextEffectRef.current = true
-        skipNextRangeEffectRef.current = true
         setChannel(channelData.channel)
-        setVideos(videosData.videos)
-        setRangeVideos(rangeData.videos)
-        setTrackedSince(rangeData.trackedSince)
-        setNextPageToken(videosData.nextPageToken || null)
+        setIsLoading(false)
 
-        // Auto-refresh views-in-range after 10 minutes to capture a second
-        // snapshot and upgrade from "estimated" to "velocity" data
         const cid = channelData.channel.id
-        refreshTimerRef.current = setTimeout(() => {
-          const ctrl = new AbortController()
-          fetchViewsInRangeApi(cid, rangeStartRef.current, rangeEndRef.current, ctrl.signal)
-            .then((data) => {
-              setRangeVideos(data.videos)
-              setTrackedSince(data.trackedSince)
-            })
-            .catch(() => {})
-        }, 10 * 60 * 1000)
+
+        setIsVideosLoading(true)
+        fetchVideosApi(cid, sortRef.current, periodRef.current, controller.signal)
+          .then((videosData) => {
+            setVideos(videosData.videos)
+            setNextPageToken(videosData.nextPageToken || null)
+          })
+          .catch((err) => {
+            if (err instanceof DOMException && err.name === "AbortError") return
+            setError(err instanceof Error ? err.message : "Failed to fetch videos")
+          })
+          .finally(() => setIsVideosLoading(false))
+
+        // Range data (views-in-range) is fetched on demand when sort is "viewsInRange"
 
         return channelData.channel as ChannelInfo
       } catch (err) {
@@ -222,7 +225,7 @@ export function useChannel(initialHandle?: string, options?: UseChannelOptions):
         controller.signal,
         nextPageToken
       )
-      setVideos((prev) => [...prev, ...data.videos])
+      setVideos((prev) => sortClientSide([...prev, ...data.videos], effectiveSort))
       setNextPageToken(data.nextPageToken || null)
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return
@@ -246,10 +249,10 @@ export function useChannel(initialHandle?: string, options?: UseChannelOptions):
       return
     }
     // When sorting by viewsInRange, the grid uses rangeVideos data directly
-    if (effectiveSort === "viewsInRange") return
+    if (effectiveSort === "viewsInRange" || effectiveSort === "viewsInRange_asc") return
 
     const controller = new AbortController()
-    setIsLoading(true)
+    setIsVideosLoading(true)
 
     fetchVideosApi(channel.id, effectiveSort, effectivePeriod, controller.signal)
       .then((data) => {
@@ -260,7 +263,7 @@ export function useChannel(initialHandle?: string, options?: UseChannelOptions):
         if (err instanceof DOMException && err.name === "AbortError") return
         setError(err instanceof Error ? err.message : "Failed to fetch videos")
       })
-      .finally(() => setIsLoading(false))
+      .finally(() => setIsVideosLoading(false))
 
     return () => controller.abort()
   }, [effectiveSort, effectivePeriod, channel])
@@ -292,37 +295,61 @@ export function useChannel(initialHandle?: string, options?: UseChannelOptions):
   useEffect(() => {
     if (initialHandle && initialHandle !== prevHandleRef.current) {
       prevHandleRef.current = initialHandle
-      fetchChannel("@" + initialHandle)
+      // Channel IDs (UC + 22 chars) should be passed as-is; handles need @ prefix
+      const isChannelId = initialHandle.startsWith("UC") && initialHandle.length === 24
+      fetchChannel(isChannelId ? initialHandle : "@" + initialHandle)
     }
   }, [initialHandle, fetchChannel])
 
-  // Refetch views-in-range when date range changes
+  // Fetch views-in-range on demand: only when sort is "viewsInRange" or "viewsInRange_asc"
+  // Also refetches when date range changes while sort is active
+  const isRangeSort = effectiveSort === "viewsInRange" || effectiveSort === "viewsInRange_asc"
   useEffect(() => {
     if (!channel) return
-    if (skipNextRangeEffectRef.current) {
-      skipNextRangeEffectRef.current = false
-      return
+    if (!isRangeSort) return
+
+    // Clear any pending auto-refresh from a previous fetch
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
     }
 
     const controller = new AbortController()
+    setIsRangeLoading(true)
+    setRangeVideos([])
 
     fetchViewsInRangeApi(channel.id, effectiveRangeStart, effectiveRangeEnd, controller.signal)
       .then((data) => {
         setRangeVideos(data.videos)
         setTrackedSince(data.trackedSince)
+
+        // Auto-refresh after 10 min to upgrade from "estimated" to "velocity"
+        const cid = channel.id
+        refreshTimerRef.current = setTimeout(() => {
+          const ctrl = new AbortController()
+          fetchViewsInRangeApi(cid, rangeStartRef.current, rangeEndRef.current, ctrl.signal)
+            .then((d) => {
+              setRangeVideos(d.videos)
+              setTrackedSince(d.trackedSince)
+            })
+            .catch(() => {})
+        }, 10 * 60 * 1000)
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return
       })
+      .finally(() => setIsRangeLoading(false))
 
     return () => controller.abort()
-  }, [effectiveRangeStart, effectiveRangeEnd, channel])
+  }, [effectiveSort, effectiveRangeStart, effectiveRangeEnd, channel])
 
   return {
     channel,
     videos,
     rangeVideos,
     isLoading,
+    isVideosLoading,
+    isRangeLoading,
     error,
     sort: effectiveSort,
     period: effectivePeriod,

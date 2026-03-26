@@ -32,18 +32,29 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { messages, channelContext, comparisonContext } = body as {
-      messages: Array<{ role: "user" | "assistant"; content: string }>
+    const { messages: rawMessages, channelContext, comparisonContext } = body as {
+      messages: Array<{ role: string; parts?: Array<{ type: string; text?: string }>; content?: string }>
       channelContext: CondensedChannelContext
       comparisonContext?: CondensedChannelContext
     }
 
-    if (!messages || !channelContext) {
+    if (!rawMessages || !channelContext) {
       return NextResponse.json(
         { error: "Missing required fields", code: "BAD_REQUEST" },
         { status: 400 }
       )
     }
+
+    // Convert UIMessage format (parts array) to CoreMessage format (role + content)
+    const messages = rawMessages.map((msg) => ({
+      role: msg.role as "user" | "assistant",
+      content:
+        msg.content ??
+        (msg.parts
+          ?.filter((p) => p.type === "text" && p.text)
+          .map((p) => p.text)
+          .join("") || ""),
+    }))
 
     const systemPrompt = buildChatPrompt(channelContext, comparisonContext)
 

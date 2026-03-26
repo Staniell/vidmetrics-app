@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useCallback, useRef } from "react"
 import type { CondensedChannelContext, AiInsights, AiComparisonInsights } from "@/types"
 
 type InsightsResult = AiInsights | AiComparisonInsights
@@ -57,13 +57,9 @@ export function useAiInsights(
     [channelData, comparisonData, period, insights]
   )
 
-  useEffect(() => {
-    fetchInsights()
-  }, [fetchInsights])
-
   const refresh = useCallback(() => {
     fetchInsights(true)
   }, [fetchInsights])
 
-  return { insights, isLoading, error, refresh }
+  return { insights, isLoading, error, refresh, fetch: fetchInsights }
 }
