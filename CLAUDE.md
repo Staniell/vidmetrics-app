@@ -20,6 +20,8 @@ npx prisma generate  # Regenerate Prisma client after schema changes
 - **next-themes** for dark mode
 - **date-fns** for date formatting
 - **react-day-picker** + **@radix-ui/react-popover** for custom date range picker
+- **sonner** for toast notifications
+- **html2canvas** + **jspdf** for PDF export
 
 ## Architecture
 
@@ -35,25 +37,34 @@ src/
     api/channel/[channelId]/views-in-range/ # GET ?start=&end= → VideoViewDelta[] sorted by views in range
     api/cron/snapshot/                    # GET → daily cron to snapshot all tracked videos
     page.tsx                              # Home page (channel search + hero carousel)
-    layout.tsx                            # Root layout with ThemeProvider + NavBar
+    layout.tsx                            # Root layout with ThemeProvider + NavBar + Toaster
     error.tsx                             # Global error boundary
     loading.tsx                           # Root loading skeleton
     icon.tsx                              # Dynamic SVG favicon
     apple-icon.tsx                        # Dynamic Apple touch icon
     globals.css                           # CSS variables (OKLCh), theme tokens, global styles
     channel/[handle]/
-      page.tsx                            # Channel detail page (videos, charts, filters)
+      page.tsx                            # Channel detail page (videos, charts, filters, comparison, PDF export)
       loading.tsx                         # Channel detail loading skeleton
     how-it-works/
       page.tsx                            # Educational page explaining VidMetrics methodology
   components/
     ui/                       # shadcn/ui primitives (badge, button, calendar, card, dropdown-menu, input, popover, select, skeleton, tooltip)
     charts/                   # Recharts components (views-chart, engagement-chart)
-    channel-input.tsx         # URL input with autocomplete dropdown + hero/compact modes
+    channel-input.tsx         # URL input with autocomplete dropdown + hero/compact modes (errors via sonner toast)
     channel-card.tsx          # Channel overview card
     date-range-picker.tsx     # Custom date range popover (wraps react-day-picker calendar)
     video-card.tsx            # Individual video card (shows range views, data source badge, video type badge)
     video-grid.tsx            # Responsive grid of VideoCards
+    compare-stat-cards.tsx    # Side-by-side channel stats with winner highlighting (comparison mode)
+    compare-charts.tsx        # Overlaid views + engagement charts for two channels (dynamic import)
+    compare-aggregates.tsx    # Head-to-head aggregate stats row (avg views, engagement, content mix)
+    compare-top-videos.tsx    # Ranked top-10 video lists for both channels
+    pdf-export-layout.tsx     # Off-screen PDF export container (uses forwardRef + portal)
+    pdf-channel-header.tsx    # Channel header section for PDF
+    pdf-charts-section.tsx    # Charts section for PDF
+    pdf-video-table.tsx       # Video metrics table for PDF
+    pdf-compare-section.tsx   # Comparison data section for PDF
     filter-bar.tsx            # Sort/period/search/video-type controls + custom date range picker
     charts-row.tsx            # Dynamic import wrapper for both charts
     hero-carousel.tsx         # Infinite marquee carousel of trending creators (homepage)
@@ -66,7 +77,7 @@ src/
   generated/
     prisma/                   # Auto-generated Prisma client (do not edit, gitignored)
   hooks/
-    use-channel.ts            # Main data hook (fetch, sort, period, range, auto-refresh timer)
+    use-channel.ts            # Main data hook (fetch, sort, period, range, auto-refresh timer, external filter overrides for comparison)
   lib/
     youtube.ts                # YouTube Data API v3 client (server-only)
     prisma.ts                 # Prisma client singleton (Neon serverless adapter)
@@ -74,7 +85,9 @@ src/
     view-deltas.ts            # Three-tier view-in-range calculation (estimated/velocity/tracked)
     parse-channel-input.ts    # URL/handle parser
     format.ts                 # Number, date, duration formatters
-    utils.ts                  # cn() — Tailwind class merging (clsx + tailwind-merge)
+    utils.ts                  # cn() + winnerClass() — Tailwind class merging + comparison highlighting
+    pdf-export.ts             # captureAndDownloadPdf(), buildExportFilename() — html2canvas + jspdf
+    pdf-theme.ts              # PDF_THEME_VARS, chart colors, hex constants for html2canvas
   types/
     index.ts                  # ChannelInfo, VideoMetrics, VideoViewDelta, VideoType, API response types
 prisma/
@@ -118,7 +131,11 @@ YouTube Data API v3 only returns cumulative lifetime `viewCount` — there's no 
 - **Charts use `next/dynamic` with `ssr: false`**: Recharts needs the DOM. See `charts-row.tsx`.
 - **shadcn/ui was set up manually**: No `npx shadcn add` available (registry was down). To add new components, create them manually in `src/components/ui/` following the existing pattern.
 - **CSS variables use OKLCh color space**: Defined in `globals.css` under `:root` and `.dark`.
-- **`useChannel` hook uses refs for stable identity**: `fetchChannel` doesn't depend on `sort`/`period`/`range` state — it reads from refs to avoid unnecessary re-renders of `ChannelInput`.
+- **`useChannel` hook uses refs for stable identity**: `fetchChannel` doesn't depend on `sort`/`period`/`range` state — it reads from refs to avoid unnecessary re-renders of `ChannelInput`. Accepts optional `UseChannelOptions` for external sort/period/range overrides (comparison mode).
+- **Channel comparison via `?vs=` query param**: `/channel/MrBeast?vs=PewDiePie` renders two `useChannel` instances with shared filter state. `CompareStatCards` replaces the single `ChannelCard` when comparing. URL is shareable/bookmarkable.
+- **Sticky toolbar**: Filters + action buttons (Export, Compare/Remove) in a single sticky row below the nav bar, above channel cards.
+- **PDF export uses html2canvas + jspdf**: Renders a hidden `PdfExportLayout` via React portal, captures to canvas, converts to PDF. Uses hardcoded hex colors in `pdf-theme.ts` because html2canvas doesn't resolve CSS variables.
+- **Toast notifications via sonner**: `<Toaster>` in root layout, `toast.error()` replaces inline error text in `ChannelInput`.
 - **Videos route validates channelId**: Regex check `UC` + 22 chars before calling YouTube API.
 - **Snapshots fire-and-forget**: `captureSnapshots()` is called with `.catch(() => {})` so DB errors never block the API response.
 - **Cron route is auth-protected**: Checks `Authorization: Bearer <CRON_SECRET>`. Vercel auto-sends this for configured crons.

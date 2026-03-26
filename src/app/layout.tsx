@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
+import { Toaster } from "sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { NavBar } from "@/components/nav-bar"
 import "./globals.css"
@@ -40,6 +41,7 @@ export default function RootLayout({
         >
           <NavBar />
           <div className="flex-1">{children}</div>
+          <Toaster richColors position="top-center" />
         </ThemeProvider>
       </body>
     </html>

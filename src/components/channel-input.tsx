@@ -8,6 +8,7 @@ import {
   type FormEvent,
 } from "react"
 import { Search, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { HeroCarousel } from "@/components/hero-carousel"
@@ -173,7 +174,6 @@ export function ChannelInput({
   compact,
 }: ChannelInputProps) {
   const [value, setValue] = useState("")
-  const [error, setError] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -253,12 +253,11 @@ export function ChannelInput({
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setError("")
     setShowDropdown(false)
 
     const parsed = parseChannelInput(value)
     if (!parsed) {
-      setError("Please enter a valid YouTube channel URL or @handle")
+      toast.error("Please enter a valid YouTube channel URL or @handle")
       return
     }
 
@@ -289,7 +288,6 @@ export function ChannelInput({
 
   function handleChange(newValue: string) {
     setValue(newValue)
-    setError("")
     setActiveIndex(-1)
     if (!newValue.trim()) {
       setResults([])
@@ -331,9 +329,6 @@ export function ChannelInput({
         <Button type="submit" size="sm" variant="secondary" disabled={isLoading}>
           {isLoading ? "Analyzing..." : "Analyze"}
         </Button>
-        {error && (
-          <p className="text-sm text-destructive-foreground">{error}</p>
-        )}
       </form>
     )
   }
@@ -387,9 +382,6 @@ export function ChannelInput({
           {isLoading ? "Analyzing..." : "Analyze Channel"}
         </Button>
       </form>
-      {error && (
-        <p className="mt-3 text-sm text-destructive-foreground">{error}</p>
-      )}
 
       <HeroCarousel onSelect={onSubmit} />
     </div>

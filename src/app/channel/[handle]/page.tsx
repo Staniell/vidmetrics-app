@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef } from "react"
+import { createPortal } from "react-dom"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { subDays, format } from "date-fns"
-import { CircleHelp, GitCompareArrows, X } from "lucide-react"
+import { CircleHelp, FileDown, GitCompareArrows, Loader2, X } from "lucide-react"
 import dynamic from "next/dynamic"
 import { useChannel } from "@/hooks/use-channel"
 import { parseChannelInput } from "@/lib/parse-channel-input"
+import { captureAndDownloadPdf, buildExportFilename } from "@/lib/pdf-export"
 import { ChannelCard } from "@/components/channel-card"
 import { ChannelInput } from "@/components/channel-input"
 import { ChartsRow } from "@/components/charts-row"
@@ -17,6 +19,7 @@ import { ErrorState } from "@/components/error-state"
 import { CompareStatCards } from "@/components/compare-stat-cards"
 import { CompareAggregates } from "@/components/compare-aggregates"
 import { CompareTopVideos } from "@/components/compare-top-videos"
+import { PdfExportLayout } from "@/components/pdf-export-layout"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -146,6 +149,59 @@ export default function ChannelPage() {
     return result
   }, [primary.rangeVideos, searchQuery, videoType])
 
+  const filteredComparisonVideos = useMemo(() => {
+    if (!isComparing) return []
+    let result = comparison.videos
+    if (videoType !== "all") {
+      result = result.filter((v) => v.videoType === videoType)
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter((v) => v.title.toLowerCase().includes(q))
+    }
+    return result
+  }, [comparison.videos, searchQuery, videoType, isComparing])
+
+  const filteredComparisonRangeVideos = useMemo(() => {
+    if (!isComparing) return []
+    let result = comparison.rangeVideos
+    if (videoType !== "all") {
+      result = result.filter((v) => v.videoType === videoType)
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter((v) => v.title.toLowerCase().includes(q))
+    }
+    return result
+  }, [comparison.rangeVideos, searchQuery, videoType, isComparing])
+
+  // PDF export
+  const [isExporting, setIsExporting] = useState(false)
+  const [showExportLayout, setShowExportLayout] = useState(false)
+  const exportLayoutRef = useRef<HTMLDivElement>(null)
+
+  const handleExport = useCallback(async () => {
+    if (!primary.channel) return
+    setIsExporting(true)
+    setShowExportLayout(true)
+
+    // Wait for layout to render
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    try {
+      if (exportLayoutRef.current) {
+        const filename = buildExportFilename(
+          primary.channel.handle,
+          isComparing ? comparison.channel?.handle : undefined
+        )
+        await captureAndDownloadPdf(exportLayoutRef.current, filename)
+      }
+    } finally {
+      setShowExportLayout(false)
+      setIsExporting(false)
+    }
+  }, [primary.channel, comparison.channel, isComparing])
+
   const activeSort = isComparing ? sharedSort : primary.sort
   const activePeriod = isComparing ? sharedPeriod : primary.period
   const activeRangeStart = isComparing ? sharedRangeStart : primary.rangeStart
@@ -160,38 +216,56 @@ export default function ChannelPage() {
 
         {primary.channel && (
           <>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex-1 min-w-0">
-                <ChannelCard channel={primary.channel} />
-              </div>
-              <div className="flex items-center gap-2 shrink-0 sm:pt-2">
-                {isComparing ? (
-                  <Button variant="outline" size="sm" onClick={handleRemoveComparison}>
-                    <X className="h-4 w-4 mr-1" />
-                    Remove
+            {/* Sticky toolbar: filters + action buttons */}
+            <div className="sticky top-14 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <FilterBar
+                  sort={activeSort}
+                  period={activePeriod}
+                  rangeStart={activeRangeStart}
+                  rangeEnd={activeRangeEnd}
+                  videoType={videoType}
+                  searchQuery={searchQuery}
+                  onSortChange={isComparing ? setSharedSort : primary.setSort}
+                  onPeriodChange={isComparing ? setSharedPeriod : primary.setPeriod}
+                  onCustomRangeChange={isComparing ? setSharedCustomRange : primary.setCustomRange}
+                  onVideoTypeChange={setVideoType}
+                  onSearchChange={setSearchQuery}
+                />
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
+                    {isExporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileDown className="h-4 w-4 mr-1" />}
+                    {isExporting ? "Exporting..." : "Export"}
                   </Button>
-                ) : showCompareInput ? (
-                  <div className="flex items-center gap-2">
-                    <ChannelInput onSubmit={handleCompareSubmit} compact />
-                    <Button variant="ghost" size="sm" onClick={() => setShowCompareInput(false)}>
-                      <X className="h-4 w-4" />
+                  {isComparing ? (
+                    <Button variant="outline" size="sm" onClick={handleRemoveComparison}>
+                      <X className="h-4 w-4 mr-1" />
+                      Remove
                     </Button>
-                  </div>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => setShowCompareInput(true)}>
-                    <GitCompareArrows className="h-4 w-4 mr-1" />
-                    Compare
-                  </Button>
-                )}
+                  ) : showCompareInput ? (
+                    <div className="flex items-center gap-2">
+                      <ChannelInput onSubmit={handleCompareSubmit} compact />
+                      <Button variant="ghost" size="sm" onClick={() => setShowCompareInput(false)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => setShowCompareInput(true)}>
+                      <GitCompareArrows className="h-4 w-4 mr-1" />
+                      Compare
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Comparison section */}
-            {isComparing && (
-              <>
+            {/* Channel header: single card when solo, side-by-side stat cards when comparing */}
+            {isComparing ? (
+              <div className="space-y-4">
                 {comparison.isLoading && !comparison.channel && (
-                  <div className="space-y-4">
-                    <Skeleton className="h-[200px] w-full rounded-xl" />
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <ChannelCard channel={primary.channel} />
+                    <Skeleton className="h-full min-h-[200px] w-full rounded-xl" />
                   </div>
                 )}
 
@@ -200,63 +274,54 @@ export default function ChannelPage() {
                 )}
 
                 {comparison.channel && (
-                  <div className="space-y-6">
-                    <CompareStatCards
-                      primary={primary.channel}
-                      comparison={comparison.channel}
-                    />
-
-                    {primary.videos.length > 0 && comparison.videos.length > 0 && (
-                      <CompareCharts
-                        primaryVideos={primary.videos}
-                        comparisonVideos={comparison.videos}
-                        primaryName={primary.channel.title}
-                        comparisonName={comparison.channel.title}
-                      />
-                    )}
-
-                    {(primary.rangeVideos.length > 0 || comparison.rangeVideos.length > 0) && (
-                      <CompareAggregates
-                        primaryVideos={primary.videos}
-                        comparisonVideos={comparison.videos}
-                        primaryRangeVideos={primary.rangeVideos}
-                        comparisonRangeVideos={comparison.rangeVideos}
-                        primaryName={primary.channel.title}
-                        comparisonName={comparison.channel.title}
-                      />
-                    )}
-
-                    {(primary.videos.length > 0 || comparison.videos.length > 0) && (
-                      <CompareTopVideos
-                        primaryVideos={primary.videos}
-                        comparisonVideos={comparison.videos}
-                        primaryRangeVideos={primary.rangeVideos}
-                        comparisonRangeVideos={comparison.rangeVideos}
-                        primaryName={primary.channel.title}
-                        comparisonName={comparison.channel.title}
-                        sort={activeSort}
-                      />
-                    )}
-                  </div>
+                  <CompareStatCards
+                    primary={primary.channel}
+                    comparison={comparison.channel}
+                  />
                 )}
-              </>
+              </div>
+            ) : (
+              <ChannelCard channel={primary.channel} />
+            )}
+
+            {/* Comparison details (charts, aggregates, top videos) */}
+            {isComparing && comparison.channel && (
+              <div className="space-y-6">
+                {primary.videos.length > 0 && comparison.videos.length > 0 && (
+                  <CompareCharts
+                    primaryVideos={primary.videos}
+                    comparisonVideos={comparison.videos}
+                    primaryName={primary.channel.title}
+                    comparisonName={comparison.channel.title}
+                  />
+                )}
+
+                {(primary.rangeVideos.length > 0 || comparison.rangeVideos.length > 0) && (
+                  <CompareAggregates
+                    primaryVideos={primary.videos}
+                    comparisonVideos={comparison.videos}
+                    primaryRangeVideos={primary.rangeVideos}
+                    comparisonRangeVideos={comparison.rangeVideos}
+                    primaryName={primary.channel.title}
+                    comparisonName={comparison.channel.title}
+                  />
+                )}
+
+                {(primary.videos.length > 0 || comparison.videos.length > 0) && (
+                  <CompareTopVideos
+                    primaryVideos={primary.videos}
+                    comparisonVideos={comparison.videos}
+                    primaryRangeVideos={primary.rangeVideos}
+                    comparisonRangeVideos={comparison.rangeVideos}
+                    primaryName={primary.channel.title}
+                    comparisonName={comparison.channel.title}
+                    sort={activeSort}
+                  />
+                )}
+              </div>
             )}
 
             {primary.videos.length > 0 && <ChartsRow videos={primary.videos} />}
-
-            <FilterBar
-              sort={activeSort}
-              period={activePeriod}
-              rangeStart={activeRangeStart}
-              rangeEnd={activeRangeEnd}
-              videoType={videoType}
-              searchQuery={searchQuery}
-              onSortChange={isComparing ? setSharedSort : primary.setSort}
-              onPeriodChange={isComparing ? setSharedPeriod : primary.setPeriod}
-              onCustomRangeChange={isComparing ? setSharedCustomRange : primary.setCustomRange}
-              onVideoTypeChange={setVideoType}
-              onSearchChange={setSearchQuery}
-            />
 
             {primary.rangeVideos.length > 0 && (() => {
               const hasEstimated = primary.rangeVideos.some((v) => v.dataSource === "estimated")
@@ -316,6 +381,25 @@ export default function ChannelPage() {
           </>
         )}
       </div>
+
+      {/* Off-screen PDF export layout — rendered via portal to avoid parent style interference */}
+      {showExportLayout &&
+        createPortal(
+          <PdfExportLayout
+            ref={exportLayoutRef}
+            channel={primary.channel!}
+            videos={filteredVideos}
+            rangeVideos={filteredRangeVideos}
+            sort={activeSort}
+            period={activePeriod}
+            rangeStart={activeRangeStart}
+            rangeEnd={activeRangeEnd}
+            comparisonChannel={isComparing ? comparison.channel ?? undefined : undefined}
+            comparisonVideos={isComparing ? filteredComparisonVideos : undefined}
+            comparisonRangeVideos={isComparing ? filteredComparisonRangeVideos : undefined}
+          />,
+          document.body
+        )}
     </main>
   )
 }
