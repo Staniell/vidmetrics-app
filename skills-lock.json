@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "youtube-thumbnail-design": {
+      "source": "inferen-sh/skills",
+      "sourceType": "github",
+      "computedHash": "1a4d4ca9b66da93aa7f43ce366ba92f3b1d33d4c7edf7906f93cb99ee1ce054e"
+    },
+    "youtube-video-analyst": {
+      "source": "shipshitdev/library",
+      "sourceType": "github",
+      "computedHash": "378e3caacef44fa6aff711530ec4d356d0345c6f9b8513b34dd5136b7b8c803b"
+    }
+  }
+}
