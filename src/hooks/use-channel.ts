@@ -33,6 +33,13 @@ interface UseChannelReturn {
   retry: () => void
 }
 
+interface UseChannelOptions {
+  externalSort?: string
+  externalPeriod?: string
+  externalRangeStart?: string
+  externalRangeEnd?: string
+}
+
 async function fetchVideosApi(
   channelId: string,
   sortBy: string,
@@ -76,7 +83,7 @@ async function fetchViewsInRangeApi(
   return res.json()
 }
 
-export function useChannel(initialHandle?: string): UseChannelReturn {
+export function useChannel(initialHandle?: string, options?: UseChannelOptions): UseChannelReturn {
   const [channel, setChannel] = useState<ChannelInfo | null>(null)
   const [videos, setVideos] = useState<VideoMetrics[]>([])
   const [rangeVideos, setRangeVideos] = useState<VideoViewDelta[]>([])
@@ -96,15 +103,21 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
   const skipNextEffectRef = useRef(false)
   const skipNextRangeEffectRef = useRef(false)
 
+  // When external overrides are provided (comparison mode), use those; otherwise fall back to internal state
+  const effectiveSort = options?.externalSort ?? sort
+  const effectivePeriod = options?.externalPeriod ?? period
+  const effectiveRangeStart = options?.externalRangeStart ?? rangeStart
+  const effectiveRangeEnd = options?.externalRangeEnd ?? rangeEnd
+
   // Stable reference to current sort/period/range for use in fetchChannel
-  const sortRef = useRef(sort)
-  const periodRef = useRef(period)
-  const rangeStartRef = useRef(rangeStart)
-  const rangeEndRef = useRef(rangeEnd)
-  sortRef.current = sort
-  periodRef.current = period
-  rangeStartRef.current = rangeStart
-  rangeEndRef.current = rangeEnd
+  const sortRef = useRef(effectiveSort)
+  const periodRef = useRef(effectivePeriod)
+  const rangeStartRef = useRef(effectiveRangeStart)
+  const rangeEndRef = useRef(effectiveRangeEnd)
+  sortRef.current = effectiveSort
+  periodRef.current = effectivePeriod
+  rangeStartRef.current = effectiveRangeStart
+  rangeEndRef.current = effectiveRangeEnd
 
   const fetchChannel = useCallback(
     async (input: string): Promise<ChannelInfo | null> => {
@@ -204,8 +217,8 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
     try {
       const data = await fetchVideosApi(
         channel.id,
-        sort,
-        period,
+        effectiveSort,
+        effectivePeriod,
         controller.signal,
         nextPageToken
       )
@@ -217,7 +230,7 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
         err instanceof Error ? err.message : "Failed to load more videos"
       )
     }
-  }, [channel, nextPageToken, sort, period])
+  }, [channel, nextPageToken, effectiveSort, effectivePeriod])
 
   const retry = useCallback(() => {
     if (lastInputRef.current) {
@@ -233,12 +246,12 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
       return
     }
     // When sorting by viewsInRange, the grid uses rangeVideos data directly
-    if (sort === "viewsInRange") return
+    if (effectiveSort === "viewsInRange") return
 
     const controller = new AbortController()
     setIsLoading(true)
 
-    fetchVideosApi(channel.id, sort, period, controller.signal)
+    fetchVideosApi(channel.id, effectiveSort, effectivePeriod, controller.signal)
       .then((data) => {
         setVideos(data.videos)
         setNextPageToken(data.nextPageToken || null)
@@ -250,7 +263,7 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
       .finally(() => setIsLoading(false))
 
     return () => controller.abort()
-  }, [sort, period, channel])
+  }, [effectiveSort, effectivePeriod, channel])
 
   const setCustomRange = useCallback((start: string, end: string) => {
     setPeriod("custom")
@@ -260,11 +273,12 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
 
   // Sync range dates when period changes (skip for custom — dates set directly)
   useEffect(() => {
+    if (options?.externalPeriod) return // externally controlled, skip sync
     if (period === "custom") return
     const { start, end } = rangeDatesFromPeriod(period)
     setRangeStart(start)
     setRangeEnd(end)
-  }, [period])
+  }, [period, options?.externalPeriod])
 
   // Clean up auto-refresh timer on unmount
   useEffect(() => {
@@ -292,7 +306,7 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
 
     const controller = new AbortController()
 
-    fetchViewsInRangeApi(channel.id, rangeStart, rangeEnd, controller.signal)
+    fetchViewsInRangeApi(channel.id, effectiveRangeStart, effectiveRangeEnd, controller.signal)
       .then((data) => {
         setRangeVideos(data.videos)
         setTrackedSince(data.trackedSince)
@@ -302,7 +316,7 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
       })
 
     return () => controller.abort()
-  }, [rangeStart, rangeEnd, channel])
+  }, [effectiveRangeStart, effectiveRangeEnd, channel])
 
   return {
     channel,
@@ -310,10 +324,10 @@ export function useChannel(initialHandle?: string): UseChannelReturn {
     rangeVideos,
     isLoading,
     error,
-    sort,
-    period,
-    rangeStart,
-    rangeEnd,
+    sort: effectiveSort,
+    period: effectivePeriod,
+    rangeStart: effectiveRangeStart,
+    rangeEnd: effectiveRangeEnd,
     trackedSince,
     nextPageToken,
     fetchChannel,

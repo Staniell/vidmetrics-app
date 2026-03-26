@@ -19,6 +19,7 @@ npx prisma generate  # Regenerate Prisma client after schema changes
 - **Prisma 7** ORM with **Neon PostgreSQL** (serverless adapter via `@prisma/adapter-neon`)
 - **next-themes** for dark mode
 - **date-fns** for date formatting
+- **react-day-picker** + **@radix-ui/react-popover** for custom date range picker
 
 ## Architecture
 
@@ -46,19 +47,20 @@ src/
     how-it-works/
       page.tsx                            # Educational page explaining VidMetrics methodology
   components/
-    ui/                       # shadcn/ui primitives (badge, button, card, dropdown-menu, input, select, skeleton, tooltip)
+    ui/                       # shadcn/ui primitives (badge, button, calendar, card, dropdown-menu, input, popover, select, skeleton, tooltip)
     charts/                   # Recharts components (views-chart, engagement-chart)
     channel-input.tsx         # URL input with autocomplete dropdown + hero/compact modes
     channel-card.tsx          # Channel overview card
-    video-card.tsx            # Individual video card (shows range views + data source badge)
+    date-range-picker.tsx     # Custom date range popover (wraps react-day-picker calendar)
+    video-card.tsx            # Individual video card (shows range views, data source badge, video type badge)
     video-grid.tsx            # Responsive grid of VideoCards
-    filter-bar.tsx            # Sort/period/search controls + date range picker
+    filter-bar.tsx            # Sort/period/search/video-type controls + custom date range picker
     charts-row.tsx            # Dynamic import wrapper for both charts
     hero-carousel.tsx         # Infinite marquee carousel of trending creators (homepage)
     trending-carousel.tsx     # Horizontal scrollable top-10 videos carousel with drag/swipe
     error-state.tsx           # Error message with retry button
     loading-state.tsx         # Full-page skeleton loader
-    nav-bar.tsx               # Sticky header with logo, "How It Works" link, dark mode toggle
+    nav-bar.tsx               # Sticky header with logo, channel search, "How It Works" link, dark mode toggle
     mode-toggle.tsx           # Dark/light/system theme switcher (uses next-themes)
     theme-provider.tsx        # next-themes ThemeProvider wrapper
   generated/
@@ -74,7 +76,7 @@ src/
     format.ts                 # Number, date, duration formatters
     utils.ts                  # cn() — Tailwind class merging (clsx + tailwind-merge)
   types/
-    index.ts                  # ChannelInfo, VideoMetrics, VideoViewDelta, API response types
+    index.ts                  # ChannelInfo, VideoMetrics, VideoViewDelta, VideoType, API response types
 prisma/
   schema.prisma               # TrackedChannel, TrackedVideo, ViewSnapshot models
 prisma.config.ts              # Prisma config (loads env from .env.local)
@@ -91,7 +93,7 @@ YouTube Data API v3 only returns cumulative lifetime `viewCount` — there's no 
 | Tier | Badge | Condition | Method |
 |------|-------|-----------|--------|
 | **Estimated** | "Est." | First visit, 1 snapshot | Age-decay weighted average (`totalViews / daysOld × ageFactor`) |
-| **Velocity** | "Live" | 2 snapshots ≥5 min apart, gap < range | Real views/min extrapolated to full range |
+| **Velocity** | (none) | 2 snapshots ≥5 min apart, gap < range | Real views/min extrapolated to full range |
 | **Tracked** | (none) | 2 snapshots spanning ≥80% of range | Exact delta: `end - start` |
 
 ### How Snapshots Accumulate
@@ -135,4 +137,4 @@ For Vercel deployment, set these same vars in Vercel project settings (Settings 
 
 ## YouTube API Quota
 
-Free tier: 10,000 units/day. Each channel lookup costs ~102 units (`search.list` = 100, `channels.list` = 1, `videos.list` = 1). That's roughly 98 lookups per day. The daily cron snapshot uses ~1 unit per 50 tracked videos (only `videos.list` with `part=statistics`).
+Free tier: 10,000 units/day. Each channel lookup costs ~3 units (`playlistItems.list` = 1, `channels.list` = 1, `videos.list` = 1). That's roughly 3,300 lookups per day. The `videos.list` call includes `part=snippet,statistics,contentDetails,liveStreamingDetails` for video type detection. The daily cron snapshot uses ~1 unit per 50 tracked videos (only `videos.list` with `part=statistics`).
