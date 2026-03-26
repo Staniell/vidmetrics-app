@@ -109,7 +109,7 @@ export default function ChannelPage() {
       }
 
       setShowCompareInput(false)
-      router.push(`/channel/${decodedHandle}?vs=${compareHandle}`)
+      router.push(`/channel/${decodedHandle}?vs=${encodeURIComponent(compareHandle)}`)
     },
     [router, decodedHandle]
   )

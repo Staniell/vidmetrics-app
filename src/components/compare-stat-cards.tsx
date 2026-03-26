@@ -2,18 +2,12 @@ import Image from "next/image"
 import { Users, Eye, Video, Calendar } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatNumber, formatDate } from "@/lib/format"
-import { cn } from "@/lib/utils"
+import { cn, winnerClass } from "@/lib/utils"
 import type { ChannelInfo } from "@/types"
 
 interface CompareStatCardsProps {
   primary: ChannelInfo
   comparison: ChannelInfo
-}
-
-function winnerClass(a: number, b: number): { aClass: string; bClass: string } {
-  if (a > b) return { aClass: "text-green-600 dark:text-green-400", bClass: "" }
-  if (b > a) return { aClass: "", bClass: "text-green-600 dark:text-green-400" }
-  return { aClass: "", bClass: "" }
 }
 
 function ChannelColumn({ channel, statClasses }: {

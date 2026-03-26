@@ -37,3 +37,9 @@ const twMerge = extendTailwindMerge({
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+export function winnerClass(a: number, b: number): { aClass: string; bClass: string } {
+  if (a > b) return { aClass: "text-green-600 dark:text-green-400", bClass: "" }
+  if (b > a) return { aClass: "", bClass: "text-green-600 dark:text-green-400" }
+  return { aClass: "", bClass: "" }
+}

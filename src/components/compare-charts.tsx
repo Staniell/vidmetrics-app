@@ -29,29 +29,29 @@ function buildViewsData(
   primaryName: string,
   comparisonName: string
 ) {
+  // Sort both by publish date (newest first) and take last 20
   const primarySorted = [...primaryVideos]
-    .sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime())
-    .slice(-20)
+    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+    .slice(0, 20)
+    .reverse()
 
   const comparisonSorted = [...comparisonVideos]
-    .sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime())
-    .slice(-20)
+    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+    .slice(0, 20)
+    .reverse()
 
-  const all = [
-    ...primarySorted.map((v) => ({ date: v.publishedAt, channel: primaryName, views: v.viewCount })),
-    ...comparisonSorted.map((v) => ({ date: v.publishedAt, channel: comparisonName, views: v.viewCount })),
-  ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  // Pair by rank so each data point has both channels
+  const maxLen = Math.max(primarySorted.length, comparisonSorted.length)
+  const data: Record<string, unknown>[] = []
 
-  // Merge into chart-friendly format with one entry per date point
-  const merged: Record<string, unknown>[] = []
-  for (const entry of all) {
-    merged.push({
-      label: formatDateShort(entry.date),
-      [entry.channel]: entry.views,
-    })
+  for (let i = 0; i < maxLen; i++) {
+    const entry: Record<string, unknown> = { label: `#${i + 1}` }
+    if (primarySorted[i]) entry[primaryName] = primarySorted[i].viewCount
+    if (comparisonSorted[i]) entry[comparisonName] = comparisonSorted[i].viewCount
+    data.push(entry)
   }
 
-  return merged
+  return data
 }
 
 function buildEngagementData(

@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { formatNumber, formatEngagement } from "@/lib/format"
-import { cn } from "@/lib/utils"
+import { cn, winnerClass } from "@/lib/utils"
 import type { VideoMetrics, VideoViewDelta } from "@/types"
 
 interface CompareAggregatesProps {
@@ -26,12 +26,6 @@ function typeBreakdown(videos: VideoMetrics[]): string {
   if (counts.short > 0) parts.push(`${Math.round((counts.short / videos.length) * 100)}% Shorts`)
   if (counts.live > 0) parts.push(`${Math.round((counts.live / videos.length) * 100)}% Lives`)
   return parts.join(", ")
-}
-
-function winnerClass(a: number, b: number): { aClass: string; bClass: string } {
-  if (a > b) return { aClass: "text-green-600 dark:text-green-400", bClass: "" }
-  if (b > a) return { aClass: "", bClass: "text-green-600 dark:text-green-400" }
-  return { aClass: "", bClass: "" }
 }
 
 export function CompareAggregates({
