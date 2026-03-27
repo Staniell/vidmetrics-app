@@ -84,7 +84,7 @@ export function AiChatContent({
 
   return (
     <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1 px-1">
+      <ScrollArea className="flex-1 px-1 overflow-hidden">
         <div ref={scrollRef} className="space-y-4 pb-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center gap-3 pt-8">

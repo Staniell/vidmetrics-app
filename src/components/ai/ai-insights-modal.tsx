@@ -101,7 +101,7 @@ export function AiInsightsModal({
           </div>
         </div>
 
-        <div className={cn("flex flex-col flex-1 min-h-0 px-4 sm:px-5 py-4", activeTab !== "chat" && "hidden")}>
+        <div className={cn("flex flex-col flex-1 min-h-0 overflow-hidden px-4 sm:px-5 py-4", activeTab !== "chat" && "hidden")}>
           <AiChatContent
             channelData={channelData}
             comparisonData={comparisonData}
