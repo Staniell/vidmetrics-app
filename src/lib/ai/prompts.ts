@@ -1,14 +1,24 @@
 import type { CondensedChannelContext } from "@/types"
 
 function channelSummary(ctx: CondensedChannelContext): string {
-  return `Channel: ${ctx.title} (${ctx.handle})
+  const hasRangeData = ctx.topByViews.length > 0
+
+  const base = `Channel: ${ctx.title} (${ctx.handle})
 Subscribers: ${ctx.subscriberCount.toLocaleString()}
 Total views: ${ctx.viewCount.toLocaleString()}
 Videos: ${ctx.videoCount}
 Joined: ${ctx.publishedAt}
 Content mix: ${ctx.contentMix.video}% videos, ${ctx.contentMix.short}% shorts, ${ctx.contentMix.live}% live
 Avg views/video: ${ctx.avgViewsPerVideo.toLocaleString()}
-Avg engagement rate: ${ctx.avgEngagementRate}%
+Avg engagement rate: ${ctx.avgEngagementRate}%`
+
+  if (!hasRangeData) {
+    return `${base}
+
+Note: Period-specific view data is not available for this analysis. Base your insights on the channel-level metrics above.`
+  }
+
+  return `${base}
 Views in selected period: ${ctx.totalViewsInRange.toLocaleString()}
 
 Top videos by views in range:

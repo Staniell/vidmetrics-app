@@ -184,7 +184,7 @@ export default function ChannelPage() {
   const [aiModalOpen, setAiModalOpen] = useState(false)
 
   const condensedChannelData = useMemo(() => {
-    if (!primary.channel || primary.rangeVideos.length === 0) return null
+    if (!primary.channel || primary.videos.length === 0) return null
     return buildChannelContext(primary.channel, primary.videos, primary.rangeVideos)
   }, [primary.channel, primary.videos, primary.rangeVideos])
 

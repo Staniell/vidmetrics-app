@@ -137,9 +137,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(object)
   } catch (err) {
     console.error("AI insights error:", err)
+    const message = err instanceof Error ? err.message : String(err)
+    const isQuota = message.toLowerCase().includes("quota") || message.toLowerCase().includes("rate")
     return NextResponse.json(
-      { error: "Failed to generate insights. Please try again.", code: "AI_ERROR" },
-      { status: 500 }
+      {
+        error: isQuota
+          ? "AI quota exceeded. Please try again later."
+          : "Failed to generate insights. Please try again.",
+        code: isQuota ? "QUOTA_EXCEEDED" : "AI_ERROR",
+      },
+      { status: isQuota ? 429 : 500 }
     )
   }
 }

@@ -14,6 +14,7 @@ interface PdfVideoTableProps {
 }
 
 interface MergedRow {
+  videoId: string
   title: string
   publishedAt: string
   videoType: string
@@ -42,6 +43,7 @@ function mergeVideoData(
     return ordered.slice(0, 50).map((rv) => {
       const base = videoMap.get(rv.videoId)
       return {
+        videoId: rv.videoId,
         title: rv.title,
         publishedAt: rv.publishedAt,
         videoType: rv.videoType,
@@ -59,6 +61,7 @@ function mergeVideoData(
   return videos.slice(0, 50).map((v) => {
     const range = rangeMap.get(v.id)
     return {
+      videoId: v.id,
       title: v.title,
       publishedAt: v.publishedAt,
       videoType: v.videoType,
@@ -130,7 +133,12 @@ function VideoTableChunk({
             <tr key={startIndex + i} style={{ backgroundColor: i % 2 === 0 ? "#ffffff" : "#fafafa" }}>
               <td style={{ ...tdStyle, color: MUTED_FOREGROUND }}>{startIndex + i + 1}</td>
               <td style={{ ...tdStyle, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {row.title}
+                <a
+                  href={`https://www.youtube.com/watch?v=${row.videoId}`}
+                  style={{ color: FOREGROUND, textDecoration: "none" }}
+                >
+                  {row.title}
+                </a>
               </td>
               <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{formatDate(row.publishedAt)}</td>
               <td style={tdStyle}>{row.videoType}</td>
