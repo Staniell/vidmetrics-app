@@ -14,14 +14,17 @@ export function buildExportFilename(
 }
 
 /** Convert all <img> elements in the container to inline data URLs so
- *  html2canvas doesn't hit cross-origin tainting issues (e.g. YouTube avatars). */
+ *  html2canvas doesn't hit cross-origin tainting issues (e.g. YouTube avatars).
+ *  Uses /api/proxy-image to fetch server-side, bypassing CORS entirely. */
 async function inlineImages(container: HTMLElement): Promise<void> {
   const images = container.querySelectorAll("img")
   await Promise.all(
     Array.from(images).map(async (img) => {
       if (!img.src || img.src.startsWith("data:")) return
       try {
-        const res = await fetch(img.src)
+        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(img.src)}`
+        const res = await fetch(proxyUrl)
+        if (!res.ok) return
         const blob = await res.blob()
         const dataUrl = await new Promise<string>((resolve) => {
           const reader = new FileReader()
