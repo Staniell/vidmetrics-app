@@ -189,7 +189,7 @@ export default function ChannelPage() {
   }, [primary.channel, primary.videos, primary.rangeVideos])
 
   const condensedComparisonData = useMemo(() => {
-    if (!isComparing || !comparison.channel || comparison.rangeVideos.length === 0) return null
+    if (!isComparing || !comparison.channel || comparison.videos.length === 0) return null
     return buildChannelContext(comparison.channel, comparison.videos, comparison.rangeVideos)
   }, [isComparing, comparison.channel, comparison.videos, comparison.rangeVideos])
 

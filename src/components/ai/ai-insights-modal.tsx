@@ -56,7 +56,10 @@ export function AiInsightsModal({
               </Button>
             )}
           </div>
-          <DialogDescription>{channelHandle.startsWith("@") ? channelHandle : `@${channelHandle}`}</DialogDescription>
+          <DialogDescription>
+            {channelHandle.startsWith("@") ? channelHandle : `@${channelHandle}`}
+            {comparisonData && ` vs ${comparisonData.handle.startsWith("@") ? comparisonData.handle : `@${comparisonData.handle}`}`}
+          </DialogDescription>
         </DialogHeader>
 
         {/* Tab switcher */}
