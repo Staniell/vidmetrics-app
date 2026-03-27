@@ -97,7 +97,7 @@ The homepage features an infinite scrolling marquee of 24 trending YouTube creat
 1. Clone the repo and install dependencies:
 
 ```bash
-git clone https://github.com/yourusername/vidmetrics-app.git
+git clone https://github.com/Staniell/vidmetrics-app.git
 cd vidmetrics-app
 npm install
 ```
